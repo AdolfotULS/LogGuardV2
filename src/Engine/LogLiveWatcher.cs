@@ -1,34 +1,43 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.Threading;
 using LogGuardV2;
 
 namespace LogGuardV2.src.Engine
 {
     /// <summary>
     /// Orchestrates live log monitoring:
-    ///   FileWatcherLive → PostgreSqlLogParser → NfaEngine[] → LogEntry
-    /// Raises <see cref="EntryDetected"/> (on a thread-pool thread) for every
-    /// parsed log line so the UI can display it.
+    ///   FileWatcherLive → PostgreSqlLogParser → NfaEngine[] (parallel) → LogEntry
+    ///
+    /// Raises <see cref="EntryDetected"/> on a thread-pool thread for every parsed
+    /// log line.  Callers must dispatch to the UI thread before touching UI objects.
     /// </summary>
     internal sealed class LogLiveWatcher : IDisposable
     {
-        private readonly FileWatcherLive  _fileWatcher;
-        private readonly List<NfaEngine>  _engines;
+        private readonly FileWatcherLive _fileWatcher;
+        private readonly List<NfaEngine> _engines;
 
-        /// <summary>Fired for each parsed log entry. May arrive on any thread — dispatch to UI as needed.</summary>
+        /// <summary>Number of loaded and enabled automaton profiles.</summary>
+        public int EngineCount => _engines.Count;
+
+        /// <summary>
+        /// Fired for each parsed log entry — may arrive on any thread-pool thread.
+        /// </summary>
         public event Action<LogEntry>? EntryDetected;
 
         public LogLiveWatcher(global::LogGuardV2.AppSettings settings, string nfaFolder)
         {
-            _fileWatcher          = new FileWatcherLive(settings.LogDirectory, settings.WatchPattern, settings.FollowRotation);
+            _fileWatcher           = new FileWatcherLive(
+                settings.LogDirectory, settings.WatchPattern, settings.FollowRotation);
             _fileWatcher.NewLines += OnNewLines;
-            _engines              = NfaLoader.LoadAll(nfaFolder);
+            _engines               = NfaLoader.LoadAll(nfaFolder);
         }
 
         public void Start(bool replayFromStart = false)
             => _fileWatcher.Start(replayFromStart);
+
+        // ── Internal pipeline ─────────────────────────────────────────────────────
 
         private void OnNewLines(IReadOnlyList<string> lines)
         {
@@ -38,7 +47,7 @@ namespace LogGuardV2.src.Engine
                     continue;
 
                 var tokens     = SqlTokenizer.Tokenize(pg.Message).ToList();
-                var isInjected = _engines.Any(e => e.Run(tokens));
+                var isInjected = RunEnginesParallel(tokens);
 
                 var entry = new LogEntry
                 {
@@ -54,6 +63,35 @@ namespace LogGuardV2.src.Engine
 
                 EntryDetected?.Invoke(entry);
             }
+        }
+
+        /// <summary>
+        /// Runs all NFA engines against <paramref name="tokens"/>.
+        /// Uses Parallel.ForEach for 3+ engines (breaks on first match),
+        /// falls back to sequential for 0-2 engines to avoid thread-pool overhead.
+        /// NfaEngine.Run() creates no shared state — fully thread-safe.
+        /// </summary>
+        private bool RunEnginesParallel(List<string> tokens)
+        {
+            switch (_engines.Count)
+            {
+                case 0: return false;
+                case 1: return _engines[0].Run(tokens);
+                case 2: return _engines[0].Run(tokens) || _engines[1].Run(tokens);
+            }
+
+            // 3+ engines: true parallel, break on first match
+            int detected = 0;
+            Parallel.ForEach(_engines, (engine, state) =>
+            {
+                if (state.ShouldExitCurrentIteration) return;
+                if (engine.Run(tokens))
+                {
+                    Interlocked.Exchange(ref detected, 1);
+                    state.Break();
+                }
+            });
+            return detected != 0;
         }
 
         public void Dispose() => _fileWatcher.Dispose();

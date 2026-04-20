@@ -35,5 +35,33 @@ namespace LogGuardV2.src.Engine
 
             return engines;
         }
+
+        /// <summary>
+        /// Loads ALL *.json profiles (enabled and disabled) from <paramref name="folder"/>,
+        /// returning each profile paired with its source file path.
+        /// Used by Module Manager UI for display and editing.
+        /// </summary>
+        public static List<(NFAModule.AutomatonProfile Profile, string FilePath)> LoadAllRaw(string folder)
+        {
+            var results = new List<(NFAModule.AutomatonProfile, string)>();
+            if (!Directory.Exists(folder)) return results;
+
+            foreach (var file in Directory.GetFiles(folder, "*.json"))
+            {
+                try
+                {
+                    var json    = File.ReadAllText(file);
+                    var profile = JsonSerializer.Deserialize<NFAModule.AutomatonProfile>(json, JsonOpts);
+                    if (profile != null)
+                        results.Add((profile, file));
+                }
+                catch
+                {
+                    // Skip malformed profile files
+                }
+            }
+
+            return results;
+        }
     }
 }

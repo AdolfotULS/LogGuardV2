@@ -1,0 +1,34 @@
+{
+  "profileId": "pgsql-bruteforce-v1",
+  "name": "Brute Force - Credential Lookup",
+  "version": "1.0.0",
+  "enabled": true,
+  "threatType": "BRUTEFORCE",
+  "target": {
+    "source": "PostgreSQL",
+    "inputField": "Query",
+    "tokenizer": "SqlTokenizer"
+  },
+  "alphabet": [
+    "SELECT", "FROM", "WHERE", "EQUALS", "STRING",
+    "IDENT", "STAR", "AND", "OR", "UNION"
+  ],
+  "states": [
+    { "id": "q0",    "isStart": true,  "isAccept": false },
+    { "id": "q_sel", "isStart": false, "isAccept": false },
+    { "id": "q_wh",  "isStart": false, "isAccept": false },
+    { "id": "q_eq",  "isStart": false, "isAccept": false },
+    { "id": "q_bf",  "isStart": false, "isAccept": true  }
+  ],
+  "transitions": [
+    { "from": "q0",    "symbol": "SELECT", "to": "q_sel" },
+    { "from": "q_sel", "symbol": "WHERE",  "to": "q_wh"  },
+    { "from": "q_wh",  "symbol": "EQUALS", "to": "q_eq"  },
+    { "from": "q_eq",  "symbol": "STRING", "to": "q_bf"  }
+  ],
+  "metadata": {
+    "severity": "Medium",
+    "description": "Detecta SELECT...WHERE...='valor' — patrón de consulta de credenciales, indicador de fuerza bruta",
+    "tags": [ "bruteforce", "credentials", "where-equals" ]
+  }
+}
