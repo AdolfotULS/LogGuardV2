@@ -4,7 +4,7 @@ using System.Text;
 
 namespace LogGuardV2.src.Model
 {
-    internal class NFAModule
+    public class NFAModule
     {
         public sealed class AutomatonProfile
         {
