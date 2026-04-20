@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using LogGuardV2.src.Engine;
 
 namespace LogGuardV2
 {
@@ -111,13 +112,29 @@ namespace LogGuardV2
     {
         private readonly ObservableCollection<LogEntry> _entries = new();
         private readonly DispatcherTimer _clock = new();
+        private LogLiveWatcher? _liveWatcher;
 
         public MainWindow()
         {
             InitializeComponent();
             LoadData();
             SetupClock();
-            Loaded += (_, _) => DrawCharts();
+            Loaded += (_, _) =>
+            {
+                DrawCharts();
+                StartLiveWatcher();
+            };
+            Closed += (_, _) => _liveWatcher?.Dispose();
+        }
+
+        private void StartLiveWatcher()
+        {
+            var settings  = SettingsService.Load();
+            var nfaFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NFA");
+            _liveWatcher  = new LogLiveWatcher(settings, nfaFolder);
+            _liveWatcher.EntryDetected += entry =>
+                Dispatcher.InvokeAsync(() => _entries.Insert(0, entry));
+            _liveWatcher.Start(settings.ReplayOnStart);
         }
 
         private void LoadData()
@@ -268,5 +285,10 @@ namespace LogGuardV2
         private void BtnMaximize_Click(object s, RoutedEventArgs e) =>
             WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
         private void BtnClose_Click(object s, RoutedEventArgs e) => Close();
+
+        private void BtnSaveSettings_Click(object s, RoutedEventArgs e) { }
+        private void BtnDiscardSettings_Click(object s, RoutedEventArgs e) { }
+        private void BtnBrowseLogDir_Click(object s, RoutedEventArgs e) { }
+        private void BtnTestPattern_Click(object s, RoutedEventArgs e) { }
     }
 }
