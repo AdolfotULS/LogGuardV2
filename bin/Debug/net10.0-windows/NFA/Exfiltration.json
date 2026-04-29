@@ -10,23 +10,62 @@
     "tokenizer": "SqlTokenizer"
   },
   "alphabet": [
-    "SELECT", "FROM", "WHERE", "STAR",
-    "IDENT", "STRING", "UNION", "AND", "OR"
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "STAR",
+    "IDENT",
+    "STRING",
+    "UNION",
+    "AND",
+    "OR"
   ],
   "states": [
-    { "id": "q0",    "isStart": true,  "isAccept": false },
-    { "id": "q_sel", "isStart": false, "isAccept": false },
-    { "id": "q_str", "isStart": false, "isAccept": false },
-    { "id": "q_ex",  "isStart": false, "isAccept": true  }
+    {
+      "id": "q0",
+      "isStart": true,
+      "isAccept": false
+    },
+    {
+      "id": "q_sel",
+      "isStart": false,
+      "isAccept": false
+    },
+    {
+      "id": "q_str",
+      "isStart": false,
+      "isAccept": false
+    },
+    {
+      "id": "q_ex",
+      "isStart": false,
+      "isAccept": true
+    }
   ],
   "transitions": [
-    { "from": "q0",    "symbol": "SELECT", "to": "q_sel" },
-    { "from": "q_sel", "symbol": "STAR",   "to": "q_str" },
-    { "from": "q_str", "symbol": "FROM",   "to": "q_ex"  }
+    {
+      "from": "q0",
+      "symbol": "SELECT",
+      "to": "q_sel"
+    },
+    {
+      "from": "q_sel",
+      "symbol": "STAR",
+      "to": "q_str"
+    },
+    {
+      "from": "q_str",
+      "symbol": "FROM",
+      "to": "q_ex"
+    }
   ],
   "metadata": {
     "severity": "High",
-    "description": "Detecta SELECT * FROM — volcado masivo de tabla, indicador de exfiltración de datos",
-    "tags": [ "exfiltration", "bulk-dump", "select-star" ]
+    "description": "Detecta SELECT * FROM \u2014 volcado masivo de tabla, indicador de exfiltraci\u00F3n de datos",
+    "tags": [
+      "exfiltration",
+      "bulk-dump",
+      "select-star"
+    ]
   }
 }
