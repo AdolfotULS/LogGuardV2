@@ -17,6 +17,7 @@ namespace LogGuardV2.src.Model
             public List<string> Alphabet { get; init; } = new();
             public List<StateDefinition> States { get; init; } = new();
             public List<TransitionDefinition> Transitions { get; init; } = new();
+            public List<string> RequireAbsentTokens { get; init; } = new();
             public MetadataDefinition Metadata { get; init; } = new();
         }
 

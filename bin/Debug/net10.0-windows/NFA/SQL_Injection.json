@@ -1,7 +1,7 @@
 {
   "profileId": "pgsql-sqli-v1",
   "name": "SQL Injection - Tautology and Union",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "enabled": true,
   "threatType": "SQLI",
   "target": {
@@ -24,51 +24,21 @@
     "IDENT"
   ],
   "states": [
-    {
-      "id": "q0",
-      "isStart": true,
-      "isAccept": false
-    },
-    {
-      "id": "q_or",
-      "isStart": false,
-      "isAccept": false
-    },
-    {
-      "id": "q_tauto",
-      "isStart": false,
-      "isAccept": true
-    },
-    {
-      "id": "q_union",
-      "isStart": false,
-      "isAccept": true
-    }
+    { "id": "q0",      "isStart": true,  "isAccept": false },
+    { "id": "q_or",    "isStart": false, "isAccept": false },
+    { "id": "q_tauto", "isStart": false, "isAccept": true  },
+    { "id": "q_union", "isStart": false, "isAccept": false },
+    { "id": "q_us",    "isStart": false, "isAccept": true  }
   ],
   "transitions": [
-    {
-      "from": "q0",
-      "symbol": "OR",
-      "to": "q_or"
-    },
-    {
-      "from": "q_or",
-      "symbol": "TAUTOLOGY",
-      "to": "q_tauto"
-    },
-    {
-      "from": "q0",
-      "symbol": "UNION",
-      "to": "q_union"
-    }
+    { "from": "q0",      "symbol": "OR",       "to": "q_or"    },
+    { "from": "q_or",    "symbol": "TAUTOLOGY", "to": "q_tauto" },
+    { "from": "q0",      "symbol": "UNION",    "to": "q_union" },
+    { "from": "q_union", "symbol": "SELECT",   "to": "q_us"    }
   ],
   "metadata": {
     "severity": "High",
-    "description": "Detecta tautolog\u00EDas tipo OR 1=1 y UNION-based SQLi",
-    "tags": [
-      "sqli",
-      "union",
-      "tautology"
-    ]
+    "description": "Detecta tautologías tipo OR 1=1 y UNION SELECT-based SQLi",
+    "tags": [ "sqli", "union", "tautology" ]
   }
 }

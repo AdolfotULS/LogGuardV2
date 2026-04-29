@@ -14,11 +14,14 @@ namespace LogGuardV2.src.Engine
         public string ProfileId   { get; }
         public string ProfileName { get; }
         public string ThreatType  { get; }
+        public string Severity    { get; }
 
         private readonly HashSet<string> _startStates;
         private readonly HashSet<string> _acceptStates;
         // _delta[fromState][symbol] = list of toStates
         private readonly Dictionary<string, Dictionary<string, List<string>>> _delta;
+
+        public IReadOnlyList<string> RequireAbsentTokens { get; }
 
         public NfaEngine(NFAModule.AutomatonProfile profile)
         {
@@ -38,16 +41,21 @@ namespace LogGuardV2.src.Engine
                     bySymbol[t.Symbol] = tos = new();
                 tos.Add(t.To);
             }
+
+            RequireAbsentTokens = profile.RequireAbsentTokens.AsReadOnly();
+            Severity            = profile.Metadata.Severity;
         }
 
         /// <summary>Returns true if the token stream contains a substring accepted by this NFA.</summary>
         public bool Run(IEnumerable<string> tokens)
         {
             var active = new HashSet<string>(_startStates);
+            var next   = new HashSet<string>();
 
             foreach (var token in tokens)
             {
-                var next = new HashSet<string>(_startStates); // re-seed start each step
+                next.Clear();
+                next.UnionWith(_startStates);
 
                 foreach (var state in active)
                 {
@@ -56,7 +64,7 @@ namespace LogGuardV2.src.Engine
                     foreach (var s in tos) next.Add(s);
                 }
 
-                active = next;
+                (active, next) = (next, active);
 
                 if (active.Overlaps(_acceptStates))
                     return true;

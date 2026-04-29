@@ -19,6 +19,41 @@
         <local:BoolToInjBgConverter       x:Key="InjBg"/>
         <local:BoolToInjBorderConverter   x:Key="InjBorder"/>
         <local:DurFmtConverter            x:Key="DurFmt"/>
+
+        <Style x:Key="FilterChip" TargetType="ToggleButton">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Padding" Value="9,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="IsChecked" Value="True"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.28"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsChecked" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.6"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
@@ -285,64 +320,78 @@
                         <Border Grid.Row="2" Background="{StaticResource Bg1}"
                                 BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1">
                             <WrapPanel Margin="14,8" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Search box -->
                                 <Border Background="{StaticResource Bg2}" BorderBrush="{StaticResource LineBrush}"
-                                        BorderThickness="1" Height="28" Width="420" Margin="0,0,8,0">
+                                        BorderThickness="1" Height="28" Width="380" Margin="0,0,8,0">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
                                         <Path Data="M21,21 L16.65,16.65 M11,18 A7,7 0 1,0 11,4 A7,7 0 1,0 11,18"
                                               Stroke="{StaticResource TextMuteBrush}" StrokeThickness="1.8"
                                               Fill="Transparent" Width="12" Height="12" Margin="0,0,8,0"/>
-                                        <TextBox Text="database:orders_prod AND level&gt;=WARNING"
+                                        <TextBox x:Name="TxtSearch"
                                                  Background="Transparent" BorderThickness="0"
                                                  Foreground="{StaticResource TextBrush}"
                                                  FontFamily="Consolas" FontSize="12"
-                                                 VerticalAlignment="Center" Width="360" CaretBrush="{StaticResource AccentBrush}"/>
+                                                 VerticalAlignment="Center" Width="320"
+                                                 CaretBrush="{StaticResource AccentBrush}"
+                                                 TextChanged="TxtSearch_TextChanged"/>
                                     </StackPanel>
                                 </Border>
-                                <Border Background="#140A0A" BorderBrush="{StaticResource DangerBrush}"
-                                        BorderThickness="1" Padding="9,4" Height="28" Margin="0,0,4,0">
+                                <!-- Threat severity chips -->
+                                <ToggleButton x:Name="ChipCritical" Style="{StaticResource FilterChip}"
+                                              Background="#140A0A" BorderBrush="{StaticResource DangerBrush}"
+                                              Tag="CRITICAL"
+                                              Checked="FilterChip_Changed" Unchecked="FilterChip_Changed">
                                     <StackPanel Orientation="Horizontal">
                                         <Ellipse Width="7" Height="7" Fill="{StaticResource DangerBrush}" Margin="0,0,6,0"/>
-                                        <TextBlock Text="FATAL" FontSize="11" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="CRITICAL" FontFamily="Consolas" FontSize="10" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
-                                </Border>
-                                <Border Background="#140A0A" BorderBrush="{StaticResource DangerBrush}"
-                                        BorderThickness="1" Padding="9,4" Height="28" Margin="0,0,4,0">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Ellipse Width="7" Height="7" Fill="{StaticResource DangerBrush}" Margin="0,0,6,0"/>
-                                        <TextBlock Text="ERROR" FontSize="11" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Background="#14100A" BorderBrush="{StaticResource WarnBrush}"
-                                        BorderThickness="1" Padding="9,4" Height="28" Margin="0,0,4,0">
+                                </ToggleButton>
+                                <ToggleButton x:Name="ChipHigh" Style="{StaticResource FilterChip}"
+                                              Background="#17120A" BorderBrush="{StaticResource WarnBrush}"
+                                              Tag="HIGH"
+                                              Checked="FilterChip_Changed" Unchecked="FilterChip_Changed">
                                     <StackPanel Orientation="Horizontal">
                                         <Ellipse Width="7" Height="7" Fill="{StaticResource WarnBrush}" Margin="0,0,6,0"/>
-                                        <TextBlock Text="WARNING" FontSize="11" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="HIGH" FontFamily="Consolas" FontSize="10" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
-                                </Border>
-                                <Border Background="{StaticResource Bg2}" BorderBrush="{StaticResource LineBrush}"
-                                        BorderThickness="1" Padding="9,4" Height="28" Margin="0,0,4,0">
+                                </ToggleButton>
+                                <ToggleButton x:Name="ChipMedium" Style="{StaticResource FilterChip}"
+                                              Background="#100A17" BorderBrush="{StaticResource InfoBrush}"
+                                              Tag="MEDIUM"
+                                              Checked="FilterChip_Changed" Unchecked="FilterChip_Changed">
                                     <StackPanel Orientation="Horizontal">
                                         <Ellipse Width="7" Height="7" Fill="{StaticResource InfoBrush}" Margin="0,0,6,0"/>
-                                        <TextBlock Text="NOTICE" FontSize="11" Foreground="{StaticResource TextDimBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="MEDIUM" FontFamily="Consolas" FontSize="10" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
-                                </Border>
-                                <Border Background="{StaticResource Bg2}" BorderBrush="{StaticResource LineBrush}"
-                                        BorderThickness="1" Padding="9,4" Height="28" Margin="0,0,8,0">
+                                </ToggleButton>
+                                <ToggleButton x:Name="ChipLow" Style="{StaticResource FilterChip}"
+                                              Background="{StaticResource Bg2}" BorderBrush="{StaticResource Line2Brush}"
+                                              Tag="LOW"
+                                              Checked="FilterChip_Changed" Unchecked="FilterChip_Changed">
                                     <StackPanel Orientation="Horizontal">
                                         <Ellipse Width="7" Height="7" Fill="{StaticResource TextMuteBrush}" Margin="0,0,6,0"/>
-                                        <TextBlock Text="LOG" FontSize="11" Foreground="{StaticResource TextDimBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="LOW" FontFamily="Consolas" FontSize="10" Foreground="{StaticResource TextDimBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
-                                </Border>
-                                <Border Background="{StaticResource Bg3}" BorderBrush="{StaticResource Line2Brush}"
-                                        BorderThickness="1" Padding="8,3" Height="28" Margin="0,0,4,0">
-                                    <TextBlock Text="LAST 15 MIN ▾" FontFamily="Consolas" FontSize="10"
-                                               Foreground="{StaticResource TextDimBrush}" VerticalAlignment="Center"/>
-                                </Border>
-                                <Border Background="{StaticResource Bg3}" BorderBrush="{StaticResource Line2Brush}"
-                                        BorderThickness="1" Padding="8,3" Height="28">
-                                    <TextBlock Text="LIVE TAIL ▾" FontFamily="Consolas" FontSize="10"
-                                               Foreground="{StaticResource TextDimBrush}" VerticalAlignment="Center"/>
-                                </Border>
+                                </ToggleButton>
+                                <!-- pg-level chips -->
+                                <ToggleButton x:Name="ChipWarning" Style="{StaticResource FilterChip}"
+                                              Background="#14100A" BorderBrush="{StaticResource WarnBrush}"
+                                              Tag="WARNING" Margin="4,0,4,0"
+                                              Checked="FilterChip_Changed" Unchecked="FilterChip_Changed">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="7" Height="7" Fill="{StaticResource WarnBrush}" Margin="0,0,6,0"/>
+                                        <TextBlock Text="WARNING" FontFamily="Consolas" FontSize="10" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton x:Name="ChipLog" Style="{StaticResource FilterChip}"
+                                              Background="{StaticResource Bg2}" BorderBrush="{StaticResource LineBrush}"
+                                              Tag="LOG" Margin="0,0,8,0"
+                                              Checked="FilterChip_Changed" Unchecked="FilterChip_Changed">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="7" Height="7" Fill="{StaticResource OkBrush}" Margin="0,0,6,0"/>
+                                        <TextBlock Text="LOG" FontFamily="Consolas" FontSize="10" Foreground="{StaticResource TextDimBrush}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
                             </WrapPanel>
                         </Border>
 
@@ -411,6 +460,9 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
+                                <!-- Threat type -->
+                                <DataGridTextColumn Header="THREAT" Width="90" Binding="{Binding ThreatType}"
+                                                   ElementStyle="{StaticResource CellTextDim}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Grid>

@@ -21,26 +21,15 @@ namespace LogGuardV2
 {
     // ─── Value converters ────────────────────────────────────────────────────────
 
-    public class LogEntry
-    {
-        public string Timestamp  { get; set; } = "";
-        public int    Pid        { get; set; }
-        public string Level      { get; set; } = "";
-        public string UserHost   { get; set; } = "";
-        public string Database   { get; set; } = "";
-        public string Query      { get; set; } = "";
-        public double Duration   { get; set; }
-        public bool   IsInjected { get; set; }
-    }
-
     public class LevelToSevColorConverter : IValueConverter
     {
         public object Convert(object v, Type t, object p, CultureInfo c) => (string)v switch
         {
-            "FATAL" or "ERROR" => Application.Current.Resources["DangerBrush"],
-            "WARNING"          => Application.Current.Resources["WarnBrush"],
-            "NOTICE"           => Application.Current.Resources["InfoBrush"],
-            _                  => Application.Current.Resources["OkBrush"]
+            "CRITICAL" or "FATAL" or "ERROR" => Application.Current.Resources["DangerBrush"],
+            "HIGH"     or "WARNING"          => Application.Current.Resources["WarnBrush"],
+            "MEDIUM"   or "NOTICE"           => Application.Current.Resources["InfoBrush"],
+            "LOW"                            => Application.Current.Resources["TextMuteBrush"],
+            _                                => Application.Current.Resources["OkBrush"]
         };
         public object ConvertBack(object v, Type t, object p, CultureInfo c) => throw new NotImplementedException();
     }
@@ -49,11 +38,11 @@ namespace LogGuardV2
     {
         public object Convert(object v, Type t, object p, CultureInfo c) => (string)v switch
         {
-            "FATAL"   => Brushes.White,
-            "ERROR"   => Application.Current.Resources["DangerBrush"],
-            "WARNING" => Application.Current.Resources["WarnBrush"],
-            "NOTICE"  => Application.Current.Resources["InfoBrush"],
-            _         => Application.Current.Resources["TextMuteBrush"]
+            "CRITICAL" or "FATAL"   => Brushes.White,
+            "HIGH"     or "ERROR"   => Application.Current.Resources["DangerBrush"],
+            "MEDIUM"   or "WARNING" => Application.Current.Resources["WarnBrush"],
+            "LOW"      or "NOTICE"  => Application.Current.Resources["InfoBrush"],
+            _                       => Application.Current.Resources["TextMuteBrush"]
         };
         public object ConvertBack(object v, Type t, object p, CultureInfo c) => throw new NotImplementedException();
     }
@@ -62,11 +51,11 @@ namespace LogGuardV2
     {
         public object Convert(object v, Type t, object p, CultureInfo c) => (string)v switch
         {
-            "FATAL"   => Application.Current.Resources["DangerBrush"],
-            "ERROR"   => new SolidColorBrush(Color.FromArgb(20,  229, 72,  77)),
-            "WARNING" => new SolidColorBrush(Color.FromArgb(20,  245, 158, 11)),
-            "NOTICE"  => new SolidColorBrush(Color.FromArgb(20,  139, 92,  246)),
-            _         => Application.Current.Resources["Bg2"]
+            "CRITICAL" or "FATAL"   => Application.Current.Resources["DangerBrush"],
+            "HIGH"     or "ERROR"   => new SolidColorBrush(Color.FromArgb(20,  229, 72,  77)),
+            "MEDIUM"   or "WARNING" => new SolidColorBrush(Color.FromArgb(20,  245, 158, 11)),
+            "LOW"      or "NOTICE"  => new SolidColorBrush(Color.FromArgb(20,  139, 92,  246)),
+            _                       => Application.Current.Resources["Bg2"]
         };
         public object ConvertBack(object v, Type t, object p, CultureInfo c) => throw new NotImplementedException();
     }
@@ -75,11 +64,11 @@ namespace LogGuardV2
     {
         public object Convert(object v, Type t, object p, CultureInfo c) => (string)v switch
         {
-            "FATAL"   => Application.Current.Resources["DangerBrush"],
-            "ERROR"   => new SolidColorBrush(Color.FromArgb(100, 229, 72,  77)),
-            "WARNING" => new SolidColorBrush(Color.FromArgb(100, 245, 158, 11)),
-            "NOTICE"  => new SolidColorBrush(Color.FromArgb(100, 139, 92,  246)),
-            _         => Application.Current.Resources["Line2Brush"]
+            "CRITICAL" or "FATAL"   => Application.Current.Resources["DangerBrush"],
+            "HIGH"     or "ERROR"   => new SolidColorBrush(Color.FromArgb(100, 229, 72,  77)),
+            "MEDIUM"   or "WARNING" => new SolidColorBrush(Color.FromArgb(100, 245, 158, 11)),
+            "LOW"      or "NOTICE"  => new SolidColorBrush(Color.FromArgb(100, 139, 92,  246)),
+            _                       => Application.Current.Resources["Line2Brush"]
         };
         public object ConvertBack(object v, Type t, object p, CultureInfo c) => throw new NotImplementedException();
     }
@@ -125,6 +114,10 @@ namespace LogGuardV2
     public partial class MainWindow : Window
     {
         private readonly ObservableCollection<LogEntry> _entries = new();
+        private System.ComponentModel.ICollectionView? _view;
+        private string _searchText = "";
+        private readonly HashSet<string> _activeFilters = new() { "CRITICAL","HIGH","MEDIUM","LOW","WARNING","LOG" };
+
         private readonly DispatcherTimer _clock   = new();
         private readonly DispatcherTimer _kpiTimer = new();
         private LogLiveWatcher? _liveWatcher;
@@ -135,16 +128,20 @@ namespace LogGuardV2
         private long _totalEvents;
         private long _fatalErrorCount;
         private long _injectedCount;
-        private long _durationSumMs;   // integer ms for atomicity
+        private long _durationSumMs;
+        private long _eventsThisSecond;
 
         public MainWindow()
         {
             InitializeComponent();
+            _view = System.Windows.Data.CollectionViewSource.GetDefaultView(_entries);
+            // ICollectionView is System.ComponentModel.ICollectionView
+            _view.Filter = FilterEntry;
+            LogGrid.ItemsSource = _view;
             LoadData();
             LoadSettingsToForm();
             SetupClock();
             SetupKpiTimer();
-            LogGrid.ItemsSource = _entries;
             Loaded += (_, _) => DrawCharts();
             Closed += (_, _) => StopWatcher();
         }
@@ -157,6 +154,14 @@ namespace LogGuardV2
         private void StartWatcher()
         {
             if (_isWatching) return;
+
+            // Fix: clear previous session to prevent duplication on restart
+            _entries.Clear();
+            Interlocked.Exchange(ref _totalEvents,      0);
+            Interlocked.Exchange(ref _fatalErrorCount,  0);
+            Interlocked.Exchange(ref _injectedCount,    0);
+            Interlocked.Exchange(ref _durationSumMs,    0);
+            Interlocked.Exchange(ref _eventsThisSecond, 0);
 
             var settings  = ReadSettingsFromForm();
             var nfaFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NFA");
@@ -193,14 +198,23 @@ namespace LogGuardV2
                 : "STOPPED · configure source in Settings then click Start";
         }
 
+        private const int MaxEntries = 5_000;
+
         private void OnLiveEntry(LogEntry entry)
         {
             Interlocked.Increment(ref _totalEvents);
-            if (entry.Level is "FATAL" or "ERROR") Interlocked.Increment(ref _fatalErrorCount);
-            if (entry.IsInjected)                  Interlocked.Increment(ref _injectedCount);
+            Interlocked.Increment(ref _eventsThisSecond);
+            if (entry.Level is "CRITICAL" or "FATAL" or "HIGH" or "ERROR")
+                Interlocked.Increment(ref _fatalErrorCount);
+            if (entry.IsInjected) Interlocked.Increment(ref _injectedCount);
             Interlocked.Add(ref _durationSumMs, (long)entry.Duration);
 
-            Dispatcher.InvokeAsync(() => _entries.Insert(0, entry));
+            Dispatcher.InvokeAsync(() =>
+            {
+                _entries.Insert(0, entry);
+                if (_entries.Count > MaxEntries)
+                    _entries.RemoveAt(_entries.Count - 1);
+            });
         }
 
         // ─── KPI refresh (every 1 s on UI thread) ─────────────────────────────────
@@ -214,6 +228,7 @@ namespace LogGuardV2
 
         private void RefreshKpis()
         {
+            var eps      = Interlocked.Exchange(ref _eventsThisSecond, 0);
             var total    = Interlocked.Read(ref _totalEvents);
             var errors   = Interlocked.Read(ref _fatalErrorCount);
             var injected = Interlocked.Read(ref _injectedCount);
@@ -221,7 +236,7 @@ namespace LogGuardV2
             var avg      = total > 0 ? (double)durSum / total : 0.0;
             var uptime   = DateTime.UtcNow - _appStart;
 
-            KpiEventsPerSec.Text = total.ToString("N0");
+            KpiEventsPerSec.Text = eps.ToString("N0");
             KpiFatalError.Text   = errors.ToString("N0");
             KpiInjected.Text     = injected.ToString("N0");
             KpiAvgDuration.Text  = avg.ToString("F1");
@@ -716,7 +731,7 @@ namespace LogGuardV2
         private void ModuleToggle_Checked(object s, RoutedEventArgs e)   => SetModuleEnabled((FrameworkElement)s, true);
         private void ModuleToggle_Unchecked(object s, RoutedEventArgs e) => SetModuleEnabled((FrameworkElement)s, false);
 
-        private static void SetModuleEnabled(FrameworkElement element, bool enabled)
+        private void SetModuleEnabled(FrameworkElement element, bool enabled)
         {
             var filePath = (string)element.Tag;
             try
@@ -724,14 +739,17 @@ namespace LogGuardV2
                 var node = JsonNode.Parse(System.IO.File.ReadAllText(filePath));
                 if (node is JsonObject obj)
                 {
-                    // Handle both "enabled" and "Enabled" keys
-                    if (obj.ContainsKey("enabled"))  obj["enabled"]  = enabled;
-                    else if (obj.ContainsKey("Enabled")) obj["Enabled"] = enabled;
+                    if (obj.ContainsKey("enabled"))       obj["enabled"]  = enabled;
+                    else if (obj.ContainsKey("Enabled"))  obj["Enabled"]  = enabled;
                     else obj["enabled"] = enabled;
 
-                    System.IO.File.WriteAllText(filePath,
+                    var tmp = filePath + ".tmp";
+                    System.IO.File.WriteAllText(tmp,
                         obj.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                    System.IO.File.Replace(tmp, filePath, null);
                 }
+
+                _liveWatcher?.ReloadEngines();
             }
             catch (Exception ex)
             {
@@ -769,12 +787,58 @@ namespace LogGuardV2
                 {
                     ModulesGrid.Children.Add(newCard);
                 }
+
+                _liveWatcher?.ReloadEngines();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Reload failed:\n{ex.Message}", "Module Manager",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        // ─── Search & Filter ──────────────────────────────────────────────────────
+
+        private bool FilterEntry(object obj)
+        {
+            if (obj is not LogEntry entry) return false;
+
+            var bucket = entry.Level.ToUpperInvariant() switch
+            {
+                "CRITICAL"                     => "CRITICAL",
+                "HIGH"                         => "HIGH",
+                "MEDIUM"                       => "MEDIUM",
+                "LOW"                          => "LOW",
+                "FATAL" or "ERROR" or "WARNING" => "WARNING",
+                _                              => "LOG"
+            };
+            if (!_activeFilters.Contains(bucket)) return false;
+
+            if (!string.IsNullOrEmpty(_searchText))
+            {
+                return entry.Query.Contains(_searchText, StringComparison.OrdinalIgnoreCase)      ||
+                       entry.UserHost.Contains(_searchText, StringComparison.OrdinalIgnoreCase)   ||
+                       entry.Database.Contains(_searchText, StringComparison.OrdinalIgnoreCase)   ||
+                       entry.ThreatType.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                       entry.Timestamp.Contains(_searchText, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return true;
+        }
+
+        private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _searchText = ((TextBox)sender).Text.Trim();
+            _view?.Refresh();
+        }
+
+        private void FilterChip_Changed(object sender, RoutedEventArgs e)
+        {
+            var chip = (ToggleButton)sender;
+            var tag  = (string)chip.Tag;
+            if (chip.IsChecked == true) _activeFilters.Add(tag);
+            else _activeFilters.Remove(tag);
+            _view?.Refresh();
         }
 
         // ─── Window chrome ────────────────────────────────────────────────────────
@@ -798,30 +862,29 @@ namespace LogGuardV2
         {
             var data = new[]
             {
-                new LogEntry { Timestamp="2026-04-19 14:26:08.214 UTC", Pid=48214, Level="ERROR",   UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM users WHERE email='a' OR 1=1--",              Duration=12.4,    IsInjected=true  },
-                new LogEntry { Timestamp="2026-04-19 14:26:08.092 UTC", Pid=48102, Level="LOG",     UserHost="analyst_02@10.2.4.18", Database="crm_readonly", Query="SELECT name,email FROM customers LIMIT 50",                 Duration=8.1,     IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:07.980 UTC", Pid=48214, Level="LOG",     UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="UPDATE orders SET status='shipped' WHERE id=4812",          Duration=4.2,     IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:07.814 UTC", Pid=48317, Level="WARNING", UserHost="migrator@10.2.7.1",    Database="billing_prod", Query="ALTER TABLE invoices ADD COLUMN tax_region VARCHAR(8)",      Duration=612.0,   IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:07.612 UTC", Pid=48402, Level="FATAL",   UserHost="unknown@10.0.4.22",    Database="auth_prod",    Query="SELECT password_hash FROM admins",                          Duration=22.9,    IsInjected=true  },
-                new LogEntry { Timestamp="2026-04-19 14:26:07.441 UTC", Pid=48218, Level="LOG",     UserHost="svc_worker@10.2.4.12", Database="events_hot",   Query="INSERT INTO events VALUES (…) ×240",                       Duration=18.7,    IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:07.220 UTC", Pid=48102, Level="LOG",     UserHost="analyst_02@10.2.4.18", Database="crm_readonly", Query="SELECT COUNT(*) FROM customers WHERE region='EMEA'",        Duration=112.3,   IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:06.998 UTC", Pid=48214, Level="LOG",     UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM sessions WHERE token='eyJhbGciOi…'",          Duration=2.1,     IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:06.812 UTC", Pid=48214, Level="ERROR",   UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM users; DROP TABLE users;--",                 Duration=0.8,     IsInjected=true  },
-                new LogEntry { Timestamp="2026-04-19 14:26:06.644 UTC", Pid=48501, Level="NOTICE",  UserHost="ops_cli@10.0.0.4",     Database="billing_prod", Query="VACUUM ANALYZE invoices",                                   Duration=1842.0,  IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:06.412 UTC", Pid=48214, Level="WARNING", UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT id,email FROM users LIMIT 100000",                  Duration=982.0,   IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:06.201 UTC", Pid=48218, Level="LOG",     UserHost="svc_worker@10.2.4.12", Database="events_hot",   Query="DELETE FROM events WHERE ts < NOW() - INTERVAL '7 days'",  Duration=410.0,   IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:05.998 UTC", Pid=48622, Level="WARNING", UserHost="login@10.0.9.1",       Database="auth_prod",    Query="SELECT id FROM users WHERE pwd='…' attempt 14",            Duration=6.4,     IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:05.772 UTC", Pid=48102, Level="LOG",     UserHost="analyst_02@10.2.4.18", Database="crm_readonly", Query="SELECT * FROM orders WHERE total > 10000",                 Duration=74.2,    IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:05.510 UTC", Pid=48214, Level="LOG",     UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT product_id FROM cart_items WHERE cart_id=1402",     Duration=1.6,     IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:05.240 UTC", Pid=48214, Level="ERROR",   UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM users UNION SELECT load_file('/etc/passwd')", Duration=3.2,     IsInjected=true  },
-                new LogEntry { Timestamp="2026-04-19 14:26:05.012 UTC", Pid=48700, Level="WARNING", UserHost="etl_nightly@10.3.1.4", Database="warehouse",    Query="COPY fact_sales TO 's3://bucket/export'",                  Duration=48210.0, IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:04.880 UTC", Pid=48214, Level="LOG",     UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM orders WHERE id=4012",                       Duration=1.4,     IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:04.712 UTC", Pid=48501, Level="NOTICE",  UserHost="ops_cli@10.0.0.4",     Database="auth_prod",    Query="GRANT SELECT ON users TO readonly_role",                   Duration=11.2,    IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:04.502 UTC", Pid=48214, Level="LOG",     UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM orders WHERE id=4011",                       Duration=1.3,     IsInjected=false },
-                new LogEntry { Timestamp="2026-04-19 14:26:04.281 UTC", Pid=48622, Level="WARNING", UserHost="login@10.0.9.1",       Database="auth_prod",    Query="SELECT id FROM users WHERE pwd='…' attempt 15",            Duration=5.8,     IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:08.214 UTC", Pid=48214, Level="HIGH",     UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM users WHERE email='a' OR 1=1--",              Duration=12.4,    IsInjected=true,  ThreatType="SQLI"       },
+                new LogEntry { Timestamp="2026-04-19 14:26:08.092 UTC", Pid=48102, Level="LOG",      UserHost="analyst_02@10.2.4.18", Database="crm_readonly", Query="SELECT name,email FROM customers LIMIT 50",                 Duration=8.1,     IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:07.980 UTC", Pid=48214, Level="LOG",      UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="UPDATE orders SET status='shipped' WHERE id=4812",          Duration=4.2,     IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:07.814 UTC", Pid=48317, Level="WARNING",  UserHost="migrator@10.2.7.1",    Database="billing_prod", Query="ALTER TABLE invoices ADD COLUMN tax_region VARCHAR(8)",      Duration=612.0,   IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:07.612 UTC", Pid=48402, Level="HIGH",     UserHost="unknown@10.0.4.22",    Database="auth_prod",    Query="SELECT password_hash FROM admins",                          Duration=22.9,    IsInjected=true,  ThreatType="EXFIL"      },
+                new LogEntry { Timestamp="2026-04-19 14:26:07.441 UTC", Pid=48218, Level="LOG",      UserHost="svc_worker@10.2.4.12", Database="events_hot",   Query="INSERT INTO events VALUES (…) ×240",                       Duration=18.7,    IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:07.220 UTC", Pid=48102, Level="LOG",      UserHost="analyst_02@10.2.4.18", Database="crm_readonly", Query="SELECT COUNT(*) FROM customers WHERE region='EMEA'",        Duration=112.3,   IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:06.998 UTC", Pid=48214, Level="LOG",      UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM sessions WHERE token='eyJhbGciOi…'",          Duration=2.1,     IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:06.812 UTC", Pid=48214, Level="HIGH",     UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM users; DROP TABLE users;--",                  Duration=0.8,     IsInjected=true,  ThreatType="SQLI"       },
+                new LogEntry { Timestamp="2026-04-19 14:26:06.644 UTC", Pid=48501, Level="NOTICE",   UserHost="ops_cli@10.0.0.4",     Database="billing_prod", Query="VACUUM ANALYZE invoices",                                   Duration=1842.0,  IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:06.412 UTC", Pid=48214, Level="WARNING",  UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT id,email FROM users LIMIT 100000",                  Duration=982.0,   IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:06.201 UTC", Pid=48218, Level="LOG",      UserHost="svc_worker@10.2.4.12", Database="events_hot",   Query="DELETE FROM events WHERE ts < NOW() - INTERVAL '7 days'",  Duration=410.0,   IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:05.998 UTC", Pid=48622, Level="WARNING",  UserHost="login@10.0.9.1",       Database="auth_prod",    Query="SELECT id FROM users WHERE pwd='…' attempt 14",            Duration=6.4,     IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:05.772 UTC", Pid=48102, Level="LOG",      UserHost="analyst_02@10.2.4.18", Database="crm_readonly", Query="SELECT * FROM orders WHERE total > 10000",                 Duration=74.2,    IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:05.510 UTC", Pid=48214, Level="LOG",      UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT product_id FROM cart_items WHERE cart_id=1402",     Duration=1.6,     IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:05.240 UTC", Pid=48214, Level="HIGH",     UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM users UNION SELECT load_file('/etc/passwd')", Duration=3.2,     IsInjected=true,  ThreatType="SQLI"       },
+                new LogEntry { Timestamp="2026-04-19 14:26:05.012 UTC", Pid=48700, Level="WARNING",  UserHost="etl_nightly@10.3.1.4", Database="warehouse",    Query="COPY fact_sales TO 's3://bucket/export'",                  Duration=48210.0, IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:04.880 UTC", Pid=48214, Level="LOG",      UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM orders WHERE id=4012",                       Duration=1.4,     IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:04.712 UTC", Pid=48501, Level="NOTICE",   UserHost="ops_cli@10.0.0.4",     Database="auth_prod",    Query="GRANT SELECT ON users TO readonly_role",                   Duration=11.2,    IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:04.502 UTC", Pid=48214, Level="LOG",      UserHost="svc_api@10.2.4.9",     Database="orders_prod",  Query="SELECT * FROM orders WHERE id=4011",                       Duration=1.3,     IsInjected=false },
+                new LogEntry { Timestamp="2026-04-19 14:26:04.281 UTC", Pid=48622, Level="WARNING",  UserHost="login@10.0.9.1",       Database="auth_prod",    Query="SELECT id FROM users WHERE pwd='…' attempt 15",            Duration=5.8,     IsInjected=false },
             };
             foreach (var e in data) _entries.Add(e);
-            LogGrid.ItemsSource = _entries;
         }
     }
 }

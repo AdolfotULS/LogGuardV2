@@ -16,7 +16,7 @@ namespace LogGuardV2.src.Engine
 
         // Order matters: comments and strings before keywords and symbols
         private static readonly Regex TokenRegex = new(
-            @"--[^\r\n]*|/\*[\s\S]*?\*/|'[^']*'|__TAUTO__|\b(?:SELECT|UNION|OR|AND|WHERE|FROM)\b|\*|=|\w+",
+            @"--[^\r\n]*|/\*[\s\S]*?\*/|'[^']*'|__TAUTO__|\b(?:SELECT|UNION|OR|AND|WHERE|FROM|ALTER|USER|WITH|GRANT|SUPERUSER|ROLE|TO|LIMIT)\b|\*|=|\w+",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public static IEnumerable<string> Tokenize(string sql)
@@ -37,13 +37,21 @@ namespace LogGuardV2.src.Engine
 
                 yield return tok.ToUpperInvariant() switch
                 {
-                    "SELECT" => "SELECT",
-                    "UNION"  => "UNION",
-                    "OR"     => "OR",
-                    "AND"    => "AND",
-                    "WHERE"  => "WHERE",
-                    "FROM"   => "FROM",
-                    _        => "IDENT"
+                    "SELECT"    => "SELECT",
+                    "UNION"     => "UNION",
+                    "OR"        => "OR",
+                    "AND"       => "AND",
+                    "WHERE"     => "WHERE",
+                    "FROM"      => "FROM",
+                    "ALTER"     => "ALTER",
+                    "USER"      => "USER",
+                    "WITH"      => "WITH",
+                    "GRANT"     => "GRANT",
+                    "SUPERUSER" => "SUPERUSER",
+                    "ROLE"      => "ROLE",
+                    "TO"        => "TO",
+                    "LIMIT"     => "LIMIT",
+                    _           => "IDENT"
                 };
             }
         }

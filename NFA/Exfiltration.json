@@ -1,7 +1,7 @@
 {
   "profileId": "pgsql-exfil-v1",
   "name": "Data Exfiltration - Bulk Dump",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "enabled": true,
   "threatType": "EXFIL",
   "target": {
@@ -10,7 +10,7 @@
     "tokenizer": "SqlTokenizer"
   },
   "alphabet": [
-    "SELECT", "FROM", "WHERE", "STAR",
+    "SELECT", "FROM", "WHERE", "LIMIT", "STAR",
     "IDENT", "STRING", "UNION", "AND", "OR"
   ],
   "states": [
@@ -24,9 +24,10 @@
     { "from": "q_sel", "symbol": "STAR",   "to": "q_str" },
     { "from": "q_str", "symbol": "FROM",   "to": "q_ex"  }
   ],
+  "requireAbsentTokens": [ "WHERE", "LIMIT" ],
   "metadata": {
     "severity": "High",
-    "description": "Detecta SELECT * FROM — volcado masivo de tabla, indicador de exfiltración de datos",
+    "description": "Detecta SELECT * FROM sin WHERE ni LIMIT — volcado masivo sin restricción",
     "tags": [ "exfiltration", "bulk-dump", "select-star" ]
   }
 }

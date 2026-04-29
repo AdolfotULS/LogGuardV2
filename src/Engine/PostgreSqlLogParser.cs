@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -26,7 +26,6 @@ namespace LogGuardV2.src.Engine
         public string Message { get; set; } = "";
         public PgLogLineType Type { get; set; } = PgLogLineType.Unknown;
 
-        // Campos comunes/opcionales
         public double? DurationMs { get; set; }
         public string? Host { get; set; }
         public int? Port { get; set; }
@@ -40,17 +39,14 @@ namespace LogGuardV2.src.Engine
         public string? SessionTime { get; set; }
 
         public override string ToString()
-        {
-            return $"[{Type}] Ts={Timestamp:O}, Pid={ProcessId}, Severity={Severity}, Message={Message}";
-        }
+            => $"[{Type}] Ts={Timestamp:O}, Pid={ProcessId}, Severity={Severity}, Message={Message}";
     }
 
     public static class PostgreSqlLogParser
     {
-        // Cabecera común:
-        // 2026-04-19 02:52:36.760 UTC [34] LOG:  connection authorized: ...
+        // Timestamp and timezone captured separately to support non-UTC servers
         private static readonly Regex HeaderRegex = new(
-            @"^(?<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+\w+)\s+\[(?<pid>\d+)\]\s+(?<severity>[A-Z]+):\s{1,}(?<message>[\s\S]*)$",
+            @"^(?<ts>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+(?<tz>\S+)\s+\[(?<pid>\d+)\]\s+(?<severity>[A-Z]+):\s{1,}(?<message>[\s\S]*)$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private static readonly Regex StatementRegex = new(
@@ -77,6 +73,9 @@ namespace LogGuardV2.src.Engine
             @"^disconnection:\s+session time:\s+(?<session_time>\S+)\s+user=(?<user>[^\s]+)\s+database=(?<database>[^\s]+)\s+host=(?<host>\S+)\s+port=(?<port>\d+)$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+        /// <summary>Fast check — does this line start a new log entry?</summary>
+        public static bool LooksLikeHeader(string line) => HeaderRegex.IsMatch(line);
+
         public static bool TryParse(string line, out PgLogEntry? entry)
         {
             entry = null;
@@ -85,29 +84,48 @@ namespace LogGuardV2.src.Engine
             if (!headerMatch.Success)
                 return false;
 
-            if (!DateTimeOffset.TryParseExact(
-                    headerMatch.Groups["timestamp"].Value,
-                    "yyyy-MM-dd HH:mm:ss.fff 'UTC'",
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal,
-                    out var timestamp))
-            {
-                return false;
-            }
+            var tsStr = headerMatch.Groups["ts"].Value;
+            var tzStr = headerMatch.Groups["tz"].Value;
 
-            var message = headerMatch.Groups["message"].Value;
+            if (!DateTime.TryParseExact(tsStr, "yyyy-MM-dd HH:mm:ss.fff",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                return false;
+
+            var timestamp = ResolveTimestamp(dt, tzStr);
+            var message   = headerMatch.Groups["message"].Value;
 
             entry = new PgLogEntry
             {
                 Timestamp = timestamp,
                 ProcessId = headerMatch.Groups["pid"].Value,
-                Severity = headerMatch.Groups["severity"].Value,
-                Message = message,
-                Type = PgLogLineType.General
+                Severity  = headerMatch.Groups["severity"].Value,
+                Message   = message,
+                Type      = PgLogLineType.General
             };
 
             ParseTypedMessage(message, entry);
             return true;
+        }
+
+        private static DateTimeOffset ResolveTimestamp(DateTime dt, string tz)
+        {
+            if (tz.Equals("UTC", StringComparison.OrdinalIgnoreCase))
+                return new DateTimeOffset(dt, TimeSpan.Zero);
+
+            // +HH:MM or -HH:MM offset
+            if (tz.Length >= 5 && (tz[0] == '+' || tz[0] == '-') &&
+                TimeSpan.TryParseExact(tz[1..], @"hh\:mm", CultureInfo.InvariantCulture, out var tsOffset))
+            {
+                var offset = tz[0] == '+' ? tsOffset : tsOffset.Negate();
+                return new DateTimeOffset(dt, offset);
+            }
+
+            // IANA / Windows timezone name
+            if (TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var tzi))
+                return new DateTimeOffset(dt, tzi.GetUtcOffset(dt));
+
+            // Unknown timezone — assume UTC, don't drop the entry
+            return new DateTimeOffset(dt, TimeSpan.Zero);
         }
 
         private static void ParseTypedMessage(string message, PgLogEntry entry)
@@ -117,7 +135,7 @@ namespace LogGuardV2.src.Engine
             m = StatementRegex.Match(message);
             if (m.Success)
             {
-                entry.Type = PgLogLineType.Statement;
+                entry.Type    = PgLogLineType.Statement;
                 entry.Message = m.Groups["statement"].Value;
                 return;
             }
@@ -125,11 +143,9 @@ namespace LogGuardV2.src.Engine
             m = DurationRegex.Match(message);
             if (m.Success)
             {
-                entry.Type = PgLogLineType.Duration;
+                entry.Type      = PgLogLineType.Duration;
                 entry.DurationMs = ParseNullableDouble(m.Groups["duration_ms"].Value);
-                entry.Message = m.Groups["detail"].Success
-                    ? m.Groups["detail"].Value
-                    : "duration";
+                entry.Message   = m.Groups["detail"].Success ? m.Groups["detail"].Value : "duration";
                 return;
             }
 
@@ -145,9 +161,9 @@ namespace LogGuardV2.src.Engine
             m = ConnectionAuthenticatedRegex.Match(message);
             if (m.Success)
             {
-                entry.Type = PgLogLineType.ConnectionAuthenticated;
+                entry.Type     = PgLogLineType.ConnectionAuthenticated;
                 entry.Identity = m.Groups["identity"].Value;
-                entry.Method = m.Groups["method"].Value;
+                entry.Method   = m.Groups["method"].Value;
                 entry.AuthFile = m.Groups["auth_file"].Value;
                 entry.AuthLine = ParseNullableInt(m.Groups["auth_line"].Value);
                 return;
@@ -156,9 +172,9 @@ namespace LogGuardV2.src.Engine
             m = ConnectionAuthorizedRegex.Match(message);
             if (m.Success)
             {
-                entry.Type = PgLogLineType.ConnectionAuthorized;
-                entry.User = m.Groups["user"].Value;
-                entry.Database = m.Groups["database"].Value;
+                entry.Type            = PgLogLineType.ConnectionAuthorized;
+                entry.User            = m.Groups["user"].Value;
+                entry.Database        = m.Groups["database"].Value;
                 entry.ApplicationName = m.Groups["application_name"].Value;
                 return;
             }
@@ -166,12 +182,12 @@ namespace LogGuardV2.src.Engine
             m = DisconnectionRegex.Match(message);
             if (m.Success)
             {
-                entry.Type = PgLogLineType.Disconnection;
+                entry.Type        = PgLogLineType.Disconnection;
                 entry.SessionTime = m.Groups["session_time"].Value;
-                entry.User = m.Groups["user"].Value;
-                entry.Database = m.Groups["database"].Value;
-                entry.Host = m.Groups["host"].Value;
-                entry.Port = ParseNullableInt(m.Groups["port"].Value);
+                entry.User        = m.Groups["user"].Value;
+                entry.Database    = m.Groups["database"].Value;
+                entry.Host        = m.Groups["host"].Value;
+                entry.Port        = ParseNullableInt(m.Groups["port"].Value);
             }
         }
 

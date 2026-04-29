@@ -25,3 +25,4 @@ C:\Users\WinterOS\source\repos\LogGuardV2\obj\Debug\net10.0-windows\LogGuardV2_C
 C:\Users\WinterOS\source\repos\LogGuardV2\obj\Debug\net10.0-windows\LogGuardV2.sourcelink.json
 C:\Users\WinterOS\source\repos\LogGuardV2\bin\Debug\net10.0-windows\NFA\Brute_Force.json
 C:\Users\WinterOS\source\repos\LogGuardV2\bin\Debug\net10.0-windows\NFA\Exfiltration.json
+C:\Users\WinterOS\source\repos\LogGuardV2\bin\Debug\net10.0-windows\NFA\Privilege Escalation.json

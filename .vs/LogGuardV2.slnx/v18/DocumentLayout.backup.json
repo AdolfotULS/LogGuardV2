@@ -35,12 +35,12 @@
       "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\src\\appsettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:src\\appsettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Model\\LogLevel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\Model\\LogLevel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\src\\model\\loglevel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:src\\model\\loglevel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\AppSettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\AppSettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -117,7 +117,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 8,
               "Title": "LogLevel.cs",
               "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Model\\LogLevel.cs",
               "RelativeDocumentMoniker": "src\\Model\\LogLevel.cs",
@@ -129,7 +129,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 9,
               "Title": "AppSettings.cs",
               "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\AppSettings.cs",
               "RelativeDocumentMoniker": "src\\AppSettings.cs",
