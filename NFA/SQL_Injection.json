@@ -1,7 +1,7 @@
 {
   "profileId": "pgsql-sqli-v1",
   "name": "SQL Injection - Tautology and Union",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "enabled": true,
   "threatType": "SQLI",
   "target": {
@@ -31,14 +31,15 @@
     { "id": "q_us",    "isStart": false, "isAccept": true  }
   ],
   "transitions": [
-    { "from": "q0",      "symbol": "OR",       "to": "q_or"    },
+    { "from": "q0",      "symbol": "OR",        "to": "q_or"    },
     { "from": "q_or",    "symbol": "TAUTOLOGY", "to": "q_tauto" },
-    { "from": "q0",      "symbol": "UNION",    "to": "q_union" },
-    { "from": "q_union", "symbol": "SELECT",   "to": "q_us"    }
+    { "from": "q0",      "symbol": "TAUTOLOGY", "to": "q_tauto" },
+    { "from": "q0",      "symbol": "UNION",     "to": "q_union" },
+    { "from": "q_union", "symbol": "SELECT",    "to": "q_us"    }
   ],
   "metadata": {
     "severity": "High",
-    "description": "Detecta tautologías tipo OR 1=1 y UNION SELECT-based SQLi",
+    "description": "Detecta tautologías tipo OR 1=1, WHERE 1=1, y UNION SELECT-based SQLi",
     "tags": [ "sqli", "union", "tautology" ]
   }
 }

@@ -1,7 +1,7 @@
 {
   "profileId": "pgsql-privesc-v1",
   "name": "Privilege Escalation - Grant Superuser",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "enabled": true,
   "threatType": "PRIVESC",
   "target": {
@@ -12,6 +12,7 @@
   "alphabet": [
     "ALTER",
     "USER",
+    "ROLE",
     "GRANT",
     "SUPERUSER",
     "TO",
@@ -20,19 +21,25 @@
     "STRING"
   ],
   "states": [
-    { "id": "q0",      "isStart": true,  "isAccept": false },
-    { "id": "q_alter", "isStart": false, "isAccept": false },
-    { "id": "q_user",  "isStart": false, "isAccept": false },
-    { "id": "q_super", "isStart": false, "isAccept": true  }
+    { "id": "q0",       "isStart": true,  "isAccept": false },
+    { "id": "q_alter",  "isStart": false, "isAccept": false },
+    { "id": "q_target", "isStart": false, "isAccept": false },
+    { "id": "q_name",   "isStart": false, "isAccept": false },
+    { "id": "q_with",   "isStart": false, "isAccept": false },
+    { "id": "q_super",  "isStart": false, "isAccept": true  }
   ],
   "transitions": [
-    { "from": "q0",      "symbol": "ALTER", "to": "q_alter" },
-    { "from": "q_alter", "symbol": "USER",  "to": "q_user"  },
-    { "from": "q_user",  "symbol": "SUPERUSER", "to": "q_super" }
+    { "from": "q0",       "symbol": "ALTER",     "to": "q_alter"  },
+    { "from": "q_alter",  "symbol": "USER",      "to": "q_target" },
+    { "from": "q_alter",  "symbol": "ROLE",      "to": "q_target" },
+    { "from": "q_target", "symbol": "IDENT",     "to": "q_name"   },
+    { "from": "q_name",   "symbol": "WITH",      "to": "q_with"   },
+    { "from": "q_name",   "symbol": "SUPERUSER", "to": "q_super"  },
+    { "from": "q_with",   "symbol": "SUPERUSER", "to": "q_super"  }
   ],
   "metadata": {
     "severity": "Critical",
-    "description": "Detecta ALTER USER ... SUPERUSER — intento de escalar privilegios a superusuario en PostgreSQL",
-    "tags": [ "privilege-escalation", "alter-user", "superuser", "postgres" ]
+    "description": "Detecta ALTER USER/ROLE <name> [WITH] SUPERUSER — escalada de privilegios a superusuario en PostgreSQL",
+    "tags": [ "privilege-escalation", "alter-user", "alter-role", "superuser", "postgres" ]
   }
 }

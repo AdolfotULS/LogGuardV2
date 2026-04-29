@@ -1,7 +1,7 @@
 {
   "profileId": "pgsql-exfil-v1",
   "name": "Data Exfiltration - Bulk Dump",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "enabled": true,
   "threatType": "EXFIL",
   "target": {
@@ -14,20 +14,24 @@
     "IDENT", "STRING", "UNION", "AND", "OR"
   ],
   "states": [
-    { "id": "q0",    "isStart": true,  "isAccept": false },
-    { "id": "q_sel", "isStart": false, "isAccept": false },
-    { "id": "q_str", "isStart": false, "isAccept": false },
-    { "id": "q_ex",  "isStart": false, "isAccept": true  }
+    { "id": "q0",        "isStart": true,  "isAccept": false },
+    { "id": "q_sel",     "isStart": false, "isAccept": false },
+    { "id": "q_kw_from", "isStart": false, "isAccept": false },
+    { "id": "q_from",    "isStart": false, "isAccept": false },
+    { "id": "q_ex",      "isStart": false, "isAccept": true  }
   ],
   "transitions": [
-    { "from": "q0",    "symbol": "SELECT", "to": "q_sel" },
-    { "from": "q_sel", "symbol": "STAR",   "to": "q_str" },
-    { "from": "q_str", "symbol": "FROM",   "to": "q_ex"  }
+    { "from": "q0",        "symbol": "SELECT", "to": "q_sel"     },
+    { "from": "q_sel",     "symbol": "IDENT",  "to": "q_sel"     },
+    { "from": "q_sel",     "symbol": "STAR",   "to": "q_kw_from" },
+    { "from": "q_sel",     "symbol": "FROM",   "to": "q_from"    },
+    { "from": "q_kw_from", "symbol": "FROM",   "to": "q_from"    },
+    { "from": "q_from",    "symbol": "IDENT",  "to": "q_ex"      }
   ],
   "requireAbsentTokens": [ "WHERE", "LIMIT" ],
   "metadata": {
     "severity": "High",
-    "description": "Detecta SELECT * FROM sin WHERE ni LIMIT — volcado masivo sin restricción",
+    "description": "Detecta SELECT */cols FROM table sin WHERE ni LIMIT — volcado masivo sin restricción",
     "tags": [ "exfiltration", "bulk-dump", "select-star" ]
   }
 }
