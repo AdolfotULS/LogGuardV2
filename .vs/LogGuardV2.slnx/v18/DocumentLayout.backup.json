@@ -1,48 +1,7 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\",
-  "Documents": [
-    {
-      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\src\\engine\\filewatcherlive.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:src\\engine\\filewatcherlive.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\src\\engine\\loglivewatcher.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:src\\engine\\loglivewatcher.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\src\\model\\nfamodule.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:src\\model\\nfamodule.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\src\\engine\\postgresqllogparser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:src\\engine\\postgresqllogparser.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\src\\model\\logentry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:src\\model\\logentry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
-      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
-      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Model\\LogLevel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\Model\\LogLevel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\AppSettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\AppSettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    }
-  ],
+  "Documents": [],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -50,130 +9,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 8,
+          "SelectedChildIndex": -1,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:1:0:{e8b06f52-6d01-11d2-aa7d-00c04f990343}"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "NFAModule.cs",
-              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Model\\NFAModule.cs",
-              "RelativeDocumentMoniker": "src\\Model\\NFAModule.cs",
-              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Model\\NFAModule.cs",
-              "RelativeToolTip": "src\\Model\\NFAModule.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-20T02:41:59.302Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "LogLiveWatcher.cs",
-              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Engine\\LogLiveWatcher.cs",
-              "RelativeDocumentMoniker": "src\\Engine\\LogLiveWatcher.cs",
-              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Engine\\LogLiveWatcher.cs",
-              "RelativeToolTip": "src\\Engine\\LogLiveWatcher.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAARAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-20T02:39:34.22Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "PostgreSqlLogParser.cs",
-              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Engine\\PostgreSqlLogParser.cs",
-              "RelativeDocumentMoniker": "src\\Engine\\PostgreSqlLogParser.cs",
-              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Engine\\PostgreSqlLogParser.cs",
-              "RelativeToolTip": "src\\Engine\\PostgreSqlLogParser.cs",
-              "ViewState": "AgIAAFIAAAAAAAAAAAAkwK4AAAANAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-20T02:37:21.391Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "LogEntry.cs",
-              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Model\\LogEntry.cs",
-              "RelativeDocumentMoniker": "src\\Model\\LogEntry.cs",
-              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Model\\LogEntry.cs",
-              "RelativeToolTip": "src\\Model\\LogEntry.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAARAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-20T02:35:30.1Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "App.xaml",
-              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\App.xaml",
-              "RelativeDocumentMoniker": "App.xaml",
-              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\App.xaml",
-              "RelativeToolTip": "App.xaml",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2026-04-20T02:32:34.385Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 8,
-              "Title": "LogLevel.cs",
-              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Model\\LogLevel.cs",
-              "RelativeDocumentMoniker": "src\\Model\\LogLevel.cs",
-              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Model\\LogLevel.cs",
-              "RelativeToolTip": "src\\Model\\LogLevel.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAqwAYAAAANAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-20T02:29:03.792Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 9,
-              "Title": "AppSettings.cs",
-              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\AppSettings.cs",
-              "RelativeDocumentMoniker": "src\\AppSettings.cs",
-              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\AppSettings.cs",
-              "RelativeToolTip": "src\\AppSettings.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAABBAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-20T02:22:45.744Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "FileWatcherLive.cs",
-              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Engine\\FileWatcherLive.cs",
-              "RelativeDocumentMoniker": "src\\Engine\\FileWatcherLive.cs",
-              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\src\\Engine\\FileWatcherLive.cs",
-              "RelativeToolTip": "src\\Engine\\FileWatcherLive.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAABkAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-20T02:20:21.911Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "MainWindow.xaml",
-              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\MainWindow.xaml",
-              "RelativeDocumentMoniker": "MainWindow.xaml",
-              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\MainWindow.xaml",
-              "RelativeToolTip": "MainWindow.xaml",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2026-04-19T15:49:02.063Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "MainWindow.xaml.cs",
-              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\MainWindow.xaml.cs",
-              "RelativeDocumentMoniker": "MainWindow.xaml.cs",
-              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\MainWindow.xaml.cs",
-              "RelativeToolTip": "MainWindow.xaml.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAqwBgAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-19T15:49:01.355Z"
             }
           ]
         }
