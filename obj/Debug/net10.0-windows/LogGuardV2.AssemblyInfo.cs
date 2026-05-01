@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LogGuardV2")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ceeff0d3cf840f30d2e986d77f9acd6deba2761f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2ee0c4f21d988c0b72f42a3e37cff2aa014f5ca3")]
 [assembly: System.Reflection.AssemblyProductAttribute("LogGuardV2")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LogGuardV2")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

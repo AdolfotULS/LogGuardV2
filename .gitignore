@@ -1,0 +1,79 @@
+# Build results
+bin/
+obj/
+.vs/
+
+# User-specific files
+*.user
+*.usertasks
+.classpath
+.project
+.c9/
+*.launch
+
+# Visual Studio Code
+.vscode/
+.devcontainer/
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Rider
+.rider/
+riderModule.iml
+.idea/
+
+# Visual Studio cache/options
+.vs/
+*.VC.db
+*.VC.VC.opendb
+
+# User-specific files (MonoDevelop/Xamarin Studio)
+*.userprefs
+
+# Build artifacts
+*.exe
+*.dll
+*.pdb
+*.nupkg
+*.snupkg
+*.deb
+*.rpm
+*.zip
+
+# Editor/IDE artifacts
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# NuGet
+.nuget/
+packages/
+*.nupkg
+*.snupkg
+!NuGet.exe
+
+# Local project artifacts
+.claude/
+.temp/
+.tmp/
+
+# Runtime files
+*.log
+*.log.*
+
+# Rider ide
+.idea/
+.idea_modules/
+
+# Coverage reports
+OpenCover/
+CodeCoverage/
+
+# Pre-compiled files
+PrecompiledWeb/

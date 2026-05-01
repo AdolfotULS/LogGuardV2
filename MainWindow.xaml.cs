@@ -130,6 +130,15 @@ namespace LogGuardV2
         private long _injectedCount;
         private long _durationSumMs;
         private long _eventsThisSecond;
+        private long _injectedThisSecond;
+        private long _fatalThisSecond;
+
+        // Sparkline history (48 points, 1s each)
+        private readonly System.Collections.Generic.Queue<double> _epsHistory  = new();
+        private readonly System.Collections.Generic.Queue<double> _injHistory  = new();
+        private readonly System.Collections.Generic.Queue<double> _fatHistory  = new();
+        private readonly System.Collections.Generic.Queue<double> _durHistory  = new();
+        private const int SparkPoints = 48;
 
         public MainWindow()
         {
@@ -205,8 +214,15 @@ namespace LogGuardV2
             Interlocked.Increment(ref _totalEvents);
             Interlocked.Increment(ref _eventsThisSecond);
             if (entry.Level is "CRITICAL" or "FATAL" or "HIGH" or "ERROR")
+            {
                 Interlocked.Increment(ref _fatalErrorCount);
-            if (entry.IsInjected) Interlocked.Increment(ref _injectedCount);
+                Interlocked.Increment(ref _fatalThisSecond);
+            }
+            if (entry.IsInjected)
+            {
+                Interlocked.Increment(ref _injectedCount);
+                Interlocked.Increment(ref _injectedThisSecond);
+            }
             Interlocked.Add(ref _durationSumMs, (long)entry.Duration);
 
             Dispatcher.InvokeAsync(() =>
@@ -228,7 +244,9 @@ namespace LogGuardV2
 
         private void RefreshKpis()
         {
-            var eps      = Interlocked.Exchange(ref _eventsThisSecond, 0);
+            var eps      = Interlocked.Exchange(ref _eventsThisSecond,   0);
+            var epsInj   = Interlocked.Exchange(ref _injectedThisSecond, 0);
+            var epsFat   = Interlocked.Exchange(ref _fatalThisSecond,    0);
             var total    = Interlocked.Read(ref _totalEvents);
             var errors   = Interlocked.Read(ref _fatalErrorCount);
             var injected = Interlocked.Read(ref _injectedCount);
@@ -242,9 +260,61 @@ namespace LogGuardV2
             KpiAvgDuration.Text  = avg.ToString("F1");
             KpiUptime.Text       = uptime.ToString(@"hh\:mm\:ss");
 
+            PushHistory(_epsHistory, eps);
+            PushHistory(_injHistory, epsInj);
+            PushHistory(_fatHistory, epsFat);
+            PushHistory(_durHistory, avg);
+
             if (_isWatching && _liveWatcher != null)
                 StatusText.Text =
                     $"LIVE · events: {total:N0} │ injected: {injected:N0} │ modules: {_liveWatcher.EngineCount}";
+
+            RefreshDashboardCharts(eps, epsInj, epsFat, avg, total, errors, injected);
+        }
+
+        private static void PushHistory(System.Collections.Generic.Queue<double> q, double v)
+        {
+            q.Enqueue(v);
+            while (q.Count > SparkPoints) q.Dequeue();
+        }
+
+        private void RefreshDashboardCharts(double eps, double epsInj, double epsFat, double avg,
+                                            long total, long errors, long injected)
+        {
+            DashQpsValue.Text    = eps.ToString("N0");
+            DashInjValue.Text    = epsInj.ToString("N0");
+            DashFatalValue.Text  = epsFat.ToString("N0");
+            DashAvgDurValue.Text = avg.ToString("F1");
+
+            double peakEps = _epsHistory.Count > 0 ? _epsHistory.Max() : 0;
+            double avgEps  = _epsHistory.Count > 0 ? _epsHistory.Average() : 0;
+            DashQpsDetail.Text   = $"peak {peakEps:N0} · avg {avgEps:N0}";
+            DashInjDetail.Text   = $"total: {injected:N0} · session";
+            DashFatalDetail.Text = $"total: {errors:N0} · session";
+
+            double[] durations = _entries.Select(e => e.Duration).Where(d => d > 0).ToArray();
+            if (durations.Length >= 10)
+            {
+                double[] sorted = durations.OrderBy(d => d).ToArray();
+                double   p95    = sorted[(int)(sorted.Length * 0.95)];
+                double   p99    = sorted[(int)(sorted.Length * 0.99)];
+                DashAvgDurDetail.Text  = $"p95 {p95:F0}ms · p99 {p99:F0}ms";
+                LatencyStatsText.Text  = $"p50 {sorted[sorted.Length / 2]:F0}ms · p95 {p95:F0}ms · p99 {p99:F0}ms";
+            }
+            else
+            {
+                DashAvgDurDetail.Text = "p95 —ms · p99 —ms";
+                LatencyStatsText.Text = "p50 —ms · p95 —ms · p99 —ms";
+            }
+
+            DrawSparkline(SparkQps,      "#4F8CFF", _epsHistory);
+            DrawSparkline(SparkInjected, "#F59E0B", _injHistory);
+            DrawSparkline(SparkFatal,    "#E5484D", _fatHistory);
+            DrawSparkline(SparkAvgDur,   "#8B5CF6", _durHistory);
+
+            DrawLevelDistribution();
+            DrawTopDatabases();
+            DrawLatencyHistogram();
         }
 
         // ─── Settings ─────────────────────────────────────────────────────────────
@@ -346,27 +416,32 @@ namespace LogGuardV2
 
         private void DrawCharts()
         {
-            var rng = new Random(42);
-            DrawSparkline(SparkQps, "#4F8CFF", rng, 14, 48);
-            DrawSparkline(SparkMem, "#F59E0B", rng, 18, 38);
-            DrawSparkline(SparkCpu, "#10B981", rng, 12, 42);
-            DrawSparkline(SparkLag, "#8B5CF6", rng, 10, 30);
+            DrawSparkline(SparkQps,      "#4F8CFF", _epsHistory);
+            DrawSparkline(SparkInjected, "#F59E0B", _injHistory);
+            DrawSparkline(SparkFatal,    "#E5484D", _fatHistory);
+            DrawSparkline(SparkAvgDur,   "#8B5CF6", _durHistory);
             DrawLatencyHistogram();
+            DrawLevelDistribution();
+            DrawTopDatabases();
         }
 
-        private static void DrawSparkline(Canvas canvas, string hex, Random rng, double lo, double hi)
+        private static void DrawSparkline(Canvas canvas, string hex, System.Collections.Generic.IEnumerable<double> dataSource)
         {
             const double w = 300, h = 60;
-            const int    pts = 48;
             canvas.Children.Clear();
+            double[] pts = dataSource.ToArray();
+            if (pts.Length < 2)
+                pts = new double[] { 0, 0 };
+
+            double min = pts.Min(), max = pts.Max();
+            double range = max > min ? max - min : 1;
             var color  = (Color)ColorConverter.ConvertFromString(hex);
             var points = new PointCollection();
-            for (int i = 0; i < pts; i++)
+            for (int i = 0; i < pts.Length; i++)
             {
-                double x = i * w / (pts - 1);
-                double y = h - Math.Max(2, Math.Min(h - 2,
-                    lo + rng.NextDouble() * (hi - lo) + Math.Sin(i * 0.4) * 6));
-                points.Add(new Point(x, y));
+                double x = i * w / (pts.Length - 1);
+                double y = h - 4 - (pts[i] - min) / range * (h - 8);
+                points.Add(new Point(x, Math.Max(2, Math.Min(h - 2, y))));
             }
             var areaPts = new PointCollection(points) { new(w, h), new(0, h) };
             canvas.Children.Add(new Polygon
@@ -387,13 +462,47 @@ namespace LogGuardV2
             const double w = 600, h = 120;
             const int    bins = 28;
             LatencyCanvas.Children.Clear();
-            double bw = w / bins;
+
+            double[] durations = _entries.Select(e => e.Duration).Where(d => d > 0).ToArray();
+            double[] binValues;
+            double   p95x;
+
+            if (durations.Length >= 5)
+            {
+                const double logMin = -1, logMax = 5;
+                double binW = (logMax - logMin) / bins;
+                var counts = new double[bins];
+                foreach (var d in durations)
+                {
+                    int b = (int)((Math.Log10(Math.Max(0.1, d)) - logMin) / binW);
+                    if (b >= 0 && b < bins) counts[b]++;
+                }
+                binValues = counts;
+
+                double[] sorted = durations.OrderBy(x => x).ToArray();
+                double   p95    = sorted[(int)(sorted.Length * 0.95)];
+                double   p95log = Math.Log10(Math.Max(0.1, p95));
+                p95x = w * Math.Clamp((p95log - logMin) / (logMax - logMin), 0.01, 0.99);
+            }
+            else
+            {
+                binValues = new double[bins];
+                for (int i = 0; i < bins; i++)
+                {
+                    double x = (double)i / bins;
+                    binValues[i] = Math.Exp(-Math.Pow((x - 0.2) * 4, 2))
+                                 + Math.Exp(-Math.Pow((x - 0.7) * 6, 2)) * 0.25;
+                }
+                p95x = w * 0.76;
+            }
+
+            double bw       = w / bins;
+            double maxCount = binValues.Max() > 0 ? binValues.Max() : 1;
+
             for (int i = 0; i < bins; i++)
             {
-                double x  = (double)i / bins;
-                double v  = Math.Exp(-Math.Pow((x - 0.2) * 4, 2))
-                          + Math.Exp(-Math.Pow((x - 0.7) * 6, 2)) * 0.25;
-                double bh = v * (h - 20);
+                double bh = binValues[i] / maxCount * (h - 20);
+                if (bh < 1) continue;
                 string hx = i > 20 ? "#E5484D" : i > 14 ? "#F59E0B" : "#4F8CFF";
                 var    c  = (Color)ColorConverter.ConvertFromString(hx);
                 var rect  = new Rectangle
@@ -406,9 +515,10 @@ namespace LogGuardV2
                 Canvas.SetTop(rect, h - bh);
                 LatencyCanvas.Children.Add(rect);
             }
+
             var marker = new Line
             {
-                X1 = w * 0.76, Y1 = 0, X2 = w * 0.76, Y2 = h,
+                X1 = p95x, Y1 = 0, X2 = p95x, Y2 = h,
                 Stroke          = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B")),
                 StrokeDashArray = new DoubleCollection { 3, 3 },
                 StrokeThickness = 1
@@ -416,14 +526,162 @@ namespace LogGuardV2
             LatencyCanvas.Children.Add(marker);
             var lbl = new TextBlock
             {
-                Text        = "p95",
+                Text       = "p95",
                 Foreground  = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B")),
                 FontFamily  = new FontFamily("Consolas"),
                 FontSize    = 10
             };
-            Canvas.SetLeft(lbl, w * 0.76 + 4);
+            Canvas.SetLeft(lbl, p95x + 4);
             Canvas.SetTop(lbl, 4);
             LatencyCanvas.Children.Add(lbl);
+        }
+
+        private void DrawLevelDistribution()
+        {
+            LevelDistCanvas.Children.Clear();
+            var buckets = new[] { "LOG",      "NOTICE",   "WARNING",  "ERROR",    "CRITICAL" };
+            var hexes   = new[] { "#10B981",  "#8B5CF6",  "#F59E0B",  "#E5484D",  "#E5484D"  };
+
+            var counts = new System.Collections.Generic.Dictionary<string, int>();
+            foreach (var b in buckets) counts[b] = 0;
+            foreach (var e in _entries)
+            {
+                var bucket = e.Level.ToUpperInvariant() switch
+                {
+                    "CRITICAL" or "FATAL"   => "CRITICAL",
+                    "HIGH"     or "ERROR"   => "ERROR",
+                    "MEDIUM"   or "WARNING" => "WARNING",
+                    "NOTICE"   or "LOW"     => "NOTICE",
+                    _                       => "LOG"
+                };
+                counts[bucket]++;
+            }
+
+            double canvasW = LevelDistCanvas.ActualWidth > 10 ? LevelDistCanvas.ActualWidth : 400;
+            const double barMaxH = 90;
+            int    maxCount = counts.Values.Max() > 0 ? counts.Values.Max() : 1;
+            double barW     = Math.Floor(canvasW / buckets.Length) - 8;
+            double gap      = (canvasW - barW * buckets.Length) / (buckets.Length + 1);
+
+            for (int i = 0; i < buckets.Length; i++)
+            {
+                string label = buckets[i];
+                string hex   = hexes[i];
+                int    count = counts[label];
+                double bh    = count > 0 ? Math.Max(3, (double)count / maxCount * barMaxH) : 0;
+                var    c     = (Color)ColorConverter.ConvertFromString(hex);
+                double x     = gap + i * (barW + gap);
+
+                if (bh > 0)
+                {
+                    var rect = new Rectangle
+                    {
+                        Width           = barW,
+                        Height          = bh,
+                        Fill            = new SolidColorBrush(Color.FromArgb(89, c.R, c.G, c.B)),
+                        Stroke          = new SolidColorBrush(c),
+                        StrokeThickness = 1
+                    };
+                    Canvas.SetLeft(rect, x);
+                    Canvas.SetTop(rect, barMaxH - bh);
+                    LevelDistCanvas.Children.Add(rect);
+                }
+
+                var tb = new TextBlock
+                {
+                    Text          = $"{label}\n{count:N0}",
+                    Foreground    = (Brush)FindResource("TextMuteBrush"),
+                    FontFamily    = new FontFamily("Consolas"),
+                    FontSize      = 9,
+                    TextAlignment = TextAlignment.Center,
+                    Width         = barW
+                };
+                Canvas.SetLeft(tb, x);
+                Canvas.SetTop(tb, barMaxH + 4);
+                LevelDistCanvas.Children.Add(tb);
+            }
+        }
+
+        private void DrawTopDatabases()
+        {
+            TopDbCanvas.Children.Clear();
+
+            if (_entries.Count == 0)
+            {
+                var empty = new TextBlock
+                {
+                    Text       = "No data — start monitoring",
+                    Foreground = (Brush)FindResource("TextMuteBrush"),
+                    FontFamily = new FontFamily("Consolas"),
+                    FontSize   = 11
+                };
+                Canvas.SetLeft(empty, 0);
+                Canvas.SetTop(empty, 20);
+                TopDbCanvas.Children.Add(empty);
+                return;
+            }
+
+            var top5 = _entries
+                .GroupBy(e => string.IsNullOrEmpty(e.Database) ? "(unknown)" : e.Database)
+                .OrderByDescending(g => g.Count())
+                .Take(5)
+                .ToArray();
+
+            double canvasW  = TopDbCanvas.ActualWidth > 10 ? TopDbCanvas.ActualWidth : 360;
+            const double nameW = 130, countW = 50, rowH = 28;
+            double barAreaW = Math.Max(20, canvasW - nameW - countW - 8);
+            int    maxCount = top5[0].Count();
+            var    accent   = (Color)ColorConverter.ConvertFromString("#4F8CFF");
+
+            for (int i = 0; i < top5.Length; i++)
+            {
+                var    grp  = top5[i];
+                double y    = i * rowH;
+                double barW = (double)grp.Count() / maxCount * barAreaW;
+
+                var nameBlock = new TextBlock
+                {
+                    Text       = grp.Key.Length > 16 ? grp.Key[..16] + "…" : grp.Key,
+                    Foreground = (Brush)FindResource("TextBrush"),
+                    FontFamily = new FontFamily("Consolas"),
+                    FontSize   = 11,
+                    Width      = nameW
+                };
+                Canvas.SetLeft(nameBlock, 0);
+                Canvas.SetTop(nameBlock, y + 2);
+                TopDbCanvas.Children.Add(nameBlock);
+
+                var track = new Rectangle
+                {
+                    Width  = barAreaW,
+                    Height = 6,
+                    Fill   = (Brush)FindResource("Bg3")
+                };
+                Canvas.SetLeft(track, nameW);
+                Canvas.SetTop(track, y + 10);
+                TopDbCanvas.Children.Add(track);
+
+                var bar = new Rectangle
+                {
+                    Width  = Math.Max(2, barW),
+                    Height = 6,
+                    Fill   = new SolidColorBrush(accent)
+                };
+                Canvas.SetLeft(bar, nameW);
+                Canvas.SetTop(bar, y + 10);
+                TopDbCanvas.Children.Add(bar);
+
+                var countBlock = new TextBlock
+                {
+                    Text       = $"{grp.Count():N0}",
+                    Foreground = (Brush)FindResource("TextMuteBrush"),
+                    FontFamily = new FontFamily("Consolas"),
+                    FontSize   = 11
+                };
+                Canvas.SetLeft(countBlock, nameW + barAreaW + 8);
+                Canvas.SetTop(countBlock, y + 2);
+                TopDbCanvas.Children.Add(countBlock);
+            }
         }
 
         // ─── Tab navigation ───────────────────────────────────────────────────────
