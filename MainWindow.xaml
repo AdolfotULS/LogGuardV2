@@ -765,7 +765,7 @@
                                                    FontSize="11" Foreground="{StaticResource TextMuteBrush}" Margin="0,0,0,12"/>
                                         <UniformGrid Columns="3" Margin="0,0,0,4">
                                             <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,8">
-                                                <DockPanel><ToggleButton x:Name="TogCoreFields" DockPanel.Dock="Right" Style="{StaticResource ToggleStyle}" IsChecked="True"/>
+                                                <DockPanel><ToggleButton x:Name="TogCoreFields" DockPanel.Dock="Right" Style="{StaticResource ToggleStyle}" IsChecked="True" IsEnabled="False"/>
                                                     <StackPanel><TextBlock Text="Timestamp · Timezone · PID · Level" FontSize="12" Foreground="{StaticResource TextBrush}"/>
                                                         <TextBlock Text="core fields · required" FontFamily="Consolas" FontSize="10" Foreground="{StaticResource TextMuteBrush}" Margin="0,2,0,0"/></StackPanel></DockPanel>
                                             </Border>
@@ -832,7 +832,7 @@
                                         </Grid>
                                         <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,8">
                                             <DockPanel>
-                                                <ToggleButton DockPanel.Dock="Right" Style="{StaticResource ToggleStyle}" IsChecked="True"/>
+                                                <ToggleButton x:Name="TogDesktopNotifications" DockPanel.Dock="Right" Style="{StaticResource ToggleStyle}" IsChecked="True"/>
                                                 <StackPanel>
                                                     <TextBlock Text="Desktop notifications" FontSize="12" Foreground="{StaticResource TextBrush}"/>
                                                     <TextBlock Text="toast on NFA accept state" FontFamily="Consolas" FontSize="10"
@@ -842,7 +842,7 @@
                                         </Border>
                                         <Border Padding="0,8">
                                             <DockPanel>
-                                                <ToggleButton DockPanel.Dock="Right" Style="{StaticResource ToggleStyle}" IsChecked="False"/>
+                                                <ToggleButton x:Name="TogAudioBeepOnFatal" DockPanel.Dock="Right" Style="{StaticResource ToggleStyle}" IsChecked="False"/>
                                                 <StackPanel>
                                                     <TextBlock Text="Audio beep on FATAL" FontSize="12" Foreground="{StaticResource TextBrush}"/>
                                                     <TextBlock Text="single 120 ms tone" FontFamily="Consolas" FontSize="10"

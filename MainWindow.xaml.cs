@@ -334,8 +334,10 @@ namespace LogGuardV2
             TogSystemMetrics.IsChecked   = s.ParseSystemMetrics;
             TogRawMessage.IsChecked      = s.ParseRawMessage;
             TogRedactPasswords.IsChecked = s.RedactPasswords;
-            TxtWebhookUrl.Text           = s.AlertWebhookUrl;
-            TxtMinLevel.Text             = s.AlertMinLevel;
+            TxtWebhookUrl.Text                  = s.AlertWebhookUrl;
+            TxtMinLevel.Text                    = s.AlertMinLevel;
+            TogDesktopNotifications.IsChecked   = s.DesktopNotifications;
+            TogAudioBeepOnFatal.IsChecked        = s.AudioBeepOnFatal;
         }
 
         private AppSettings ReadSettingsFromForm() => new()
@@ -353,7 +355,9 @@ namespace LogGuardV2
             ParseRawMessage        = TogRawMessage.IsChecked        == true,
             RedactPasswords        = TogRedactPasswords.IsChecked   == true,
             AlertWebhookUrl        = TxtWebhookUrl.Text.Trim(),
-            AlertMinLevel          = TxtMinLevel.Text.Trim()
+            AlertMinLevel          = TxtMinLevel.Text.Trim(),
+            DesktopNotifications   = TogDesktopNotifications.IsChecked == true,
+            AudioBeepOnFatal       = TogAudioBeepOnFatal.IsChecked     == true
         };
 
         private void BtnSaveSettings_Click(object s, RoutedEventArgs e)

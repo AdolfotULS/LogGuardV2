@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
 using LogGuardV2.src.Model;
 
 namespace LogGuardV2.src.Engine
@@ -10,7 +11,11 @@ namespace LogGuardV2.src.Engine
     /// Orchestrates live log monitoring:
     ///   FileWatcherLive → PostgreSqlLogParser → SqlTokenizer → NfaEngine[] → LogEntry
     ///
-    /// Raises <see cref="EntryDetected"/> on a thread-pool thread.
+    /// File I/O and NFA processing are decoupled via a Channel: OnNewLines (called
+    /// under the file-watcher lock) only accumulates multi-line entries and enqueues
+    /// them; a dedicated consumer task performs all CPU-heavy work independently.
+    ///
+    /// Raises <see cref="EntryDetected"/> on the consumer task thread.
     /// Callers must dispatch to the UI thread before touching UI objects.
     /// </summary>
     internal sealed class LogLiveWatcher : IDisposable
@@ -19,15 +24,26 @@ namespace LogGuardV2.src.Engine
         private readonly string          _nfaFolder;
         private List<NfaEngine>          _engines;
 
-        // C1: PID → (User, Database, Host) from ConnectionAuthorized entries
+        // Decouples file-watcher I/O from NFA processing.
+        // SingleWriter = OnNewLines (always under _readLock), SingleReader = consumer task.
+        private readonly Channel<string> _entryChannel = Channel.CreateUnbounded<string>(
+            new UnboundedChannelOptions
+            {
+                SingleReader                  = true,
+                SingleWriter                  = true,
+                AllowSynchronousContinuations = false
+            });
+        private readonly Task _consumer;
+
+        // C1: PID → (User, Database, Host) — only accessed from consumer task (single reader)
         private readonly Dictionary<int, (string User, string Database, string Host)> _pidCtx = new();
 
-        // A3: brute-force sliding window — key = "user@host"
+        // A3: brute-force sliding window — only accessed from consumer task
         private readonly Dictionary<string, Queue<DateTimeOffset>> _bfWindow = new();
         private const int BfThreshold = 5;
         private static readonly TimeSpan BfWindowDuration = TimeSpan.FromMinutes(1);
 
-        // M5: pending multi-line accumulation
+        // M5: pending multi-line accumulation — only accessed from OnNewLines (under file-watcher lock)
         private string? _pendingLine;
 
         public int EngineCount => _engines.Count;
@@ -36,11 +52,12 @@ namespace LogGuardV2.src.Engine
 
         public LogLiveWatcher(AppSettings settings, string nfaFolder)
         {
-            _nfaFolder             = nfaFolder;
-            _engines               = NfaLoader.LoadAll(nfaFolder);
-            _fileWatcher           = new FileWatcherLive(
+            _nfaFolder   = nfaFolder;
+            _engines     = NfaLoader.LoadAll(nfaFolder);
+            _fileWatcher = new FileWatcherLive(
                 settings.LogDirectory, settings.WatchPattern, settings.FollowRotation);
             _fileWatcher.NewLines += OnNewLines;
+            _consumer = Task.Run(ConsumeEntries);
         }
 
         public void Start(bool replayFromStart = false) => _fileWatcher.Start(replayFromStart);
@@ -49,26 +66,34 @@ namespace LogGuardV2.src.Engine
         public void ReloadEngines()
             => Interlocked.Exchange(ref _engines, NfaLoader.LoadAll(_nfaFolder));
 
-        // ── Pipeline ──────────────────────────────────────────────────────────────
+        // ── Pipeline: producer side (runs under FileWatcherLive._readLock) ─────────
 
         private void OnNewLines(IReadOnlyList<string> lines)
         {
+            var writer = _entryChannel.Writer;
             foreach (var raw in lines)
             {
                 // M5: accumulate continuation lines (DETAIL/HINT/CONTEXT)
                 if (!PostgreSqlLogParser.LooksLikeHeader(raw))
                 {
                     if (_pendingLine != null)
-                        _pendingLine += "\n" + raw.TrimStart();
+                        _pendingLine = string.Concat(_pendingLine, "\n", raw.TrimStart());
                     continue;
                 }
 
                 if (_pendingLine != null)
-                    ProcessLine(_pendingLine);
+                    writer.TryWrite(_pendingLine);
 
                 _pendingLine = raw;
             }
-            // Don't flush _pendingLine here — continuation lines may arrive in next batch
+        }
+
+        // ── Pipeline: consumer side (dedicated background task) ───────────────────
+
+        private async Task ConsumeEntries()
+        {
+            await foreach (var line in _entryChannel.Reader.ReadAllAsync().ConfigureAwait(false))
+                ProcessLine(line);
         }
 
         private void ProcessLine(string line)
@@ -79,18 +104,24 @@ namespace LogGuardV2.src.Engine
             // C1: track PID context from connection events
             if (pg.Type == PgLogLineType.ConnectionAuthorized && pg.User != null)
             {
-                var pid = ParsePid(pg.ProcessId);
-                _pidCtx[pid] = (pg.User, pg.Database ?? "", pg.Host ?? "");
+                _pidCtx[ParsePid(pg.ProcessId)] = (pg.User, pg.Database ?? "", pg.Host ?? "");
+                return;
+            }
+
+            // C1: free PID context on disconnect to bound dictionary growth
+            if (pg.Type == PgLogLineType.Disconnection)
+            {
+                _pidCtx.Remove(ParsePid(pg.ProcessId));
                 return;
             }
 
             // B3: only run NFA on Statement entries (lines with actual SQL)
             if (pg.Type != PgLogLineType.Statement) return;
 
-            var pid2 = ParsePid(pg.ProcessId);
-            _pidCtx.TryGetValue(pid2, out var ctx);
+            var pid = ParsePid(pg.ProcessId);
+            _pidCtx.TryGetValue(pid, out var ctx);
 
-            var tokens        = SqlTokenizer.Tokenize(pg.Message).ToList();
+            var tokens        = SqlTokenizer.Tokenize(pg.Message);
             var matchedEngine = RunEngines(tokens);
 
             // A3: brute-force requires rate confirmation, not just pattern match
@@ -100,7 +131,6 @@ namespace LogGuardV2.src.Engine
                 if (!IsBruteForce(key)) matchedEngine = null;
             }
 
-            // Use NFA severity for threat entries; pg severity for normal entries
             var level = matchedEngine != null
                 ? matchedEngine.Severity.ToUpperInvariant()
                 : pg.Severity;
@@ -108,10 +138,10 @@ namespace LogGuardV2.src.Engine
             var entry = new LogEntry
             {
                 Timestamp  = pg.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff UTC"),
-                Pid        = pid2,
+                Pid        = pid,
                 Level      = level,
                 UserHost   = $"{ctx.User ?? pg.Identity ?? "unknown"}@{ctx.Host ?? pg.Host ?? "unknown"}",
-                Database   = ctx.Database.Length > 0 ? ctx.Database : (pg.Database ?? ""),
+                Database   = !string.IsNullOrEmpty(ctx.Database) ? ctx.Database : (pg.Database ?? ""),
                 Query      = pg.Message,
                 Duration   = pg.DurationMs ?? 0,
                 IsInjected = matchedEngine != null,
@@ -135,50 +165,59 @@ namespace LogGuardV2.src.Engine
             return q.Count >= BfThreshold;
         }
 
-        // M2: returns matched engine (carries ThreatType + Severity) or null
+        // M2: returns first matched engine or null.
+        // tokenSet is lazily computed and shared across all absent-token checks in one call.
         private NfaEngine? RunEngines(List<string> tokens)
         {
-            var engines = _engines;
+            var engines = _engines; // snapshot — ReloadEngines may swap field concurrently
             if (engines.Count == 0) return null;
 
-            if (engines.Count <= 2)
+            HashSet<string>? tokenSet = null;
+
+            // Sequential path for small engine counts — avoids Parallel.ForEach overhead
+            if (engines.Count <= 4)
             {
                 foreach (var e in engines)
-                    if (MatchEngine(e, tokens)) return e;
+                {
+                    if (!e.Run(tokens)) continue;
+                    if (e.RequireAbsentTokens.Count > 0)
+                    {
+                        tokenSet ??= new HashSet<string>(tokens);
+                        bool blocked = false;
+                        foreach (var a in e.RequireAbsentTokens)
+                            if (tokenSet.Contains(a)) { blocked = true; break; }
+                        if (blocked) continue;
+                    }
+                    return e;
+                }
                 return null;
             }
 
+            // Parallel path for larger engine sets — pre-compute tokenSet once for all threads
+            tokenSet = new HashSet<string>(tokens);
             NfaEngine? found = null;
             Parallel.ForEach(engines, (engine, state) =>
             {
                 if (state.ShouldExitCurrentIteration) return;
-                if (MatchEngine(engine, tokens))
+                if (!engine.Run(tokens)) return;
+                if (engine.RequireAbsentTokens.Count > 0)
                 {
-                    Interlocked.CompareExchange(ref found, engine, null);
-                    state.Break();
+                    foreach (var a in engine.RequireAbsentTokens)
+                        if (tokenSet.Contains(a)) return;
                 }
+                Interlocked.CompareExchange(ref found, engine, null);
+                state.Break();
             });
             return found;
-        }
-
-        // A2: post-match absent-token filter for EXFIL and similar profiles
-        private static bool MatchEngine(NfaEngine engine, List<string> tokens)
-        {
-            if (!engine.Run(tokens)) return false;
-
-            if (engine.RequireAbsentTokens.Count > 0)
-            {
-                var tokenSet = new HashSet<string>(tokens);
-                foreach (var absent in engine.RequireAbsentTokens)
-                    if (tokenSet.Contains(absent)) return false;
-            }
-
-            return true;
         }
 
         private static int ParsePid(string s)
             => int.TryParse(s, out var p) ? p : 0;
 
-        public void Dispose() => _fileWatcher.Dispose();
+        public void Dispose()
+        {
+            _entryChannel.Writer.TryComplete();
+            _fileWatcher.Dispose();
+        }
     }
 }

@@ -19,23 +19,30 @@ namespace LogGuardV2.src.Engine
             @"--[^\r\n]*|/\*[\s\S]*?\*/|'[^']*'|__TAUTO__|\b(?:SELECT|UNION|OR|AND|WHERE|FROM|ALTER|USER|WITH|GRANT|SUPERUSER|ROLE|TO|LIMIT)\b|\*|=|\w+",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        public static IEnumerable<string> Tokenize(string sql)
+        /// <summary>
+        /// Returns a materialized token list. Callers pass it to multiple NFA engines
+        /// so eager evaluation avoids re-executing regex for each engine.
+        /// </summary>
+        public static List<string> Tokenize(string sql)
         {
             sql = TautologyNum.Replace(sql, " __TAUTO__ ");
             sql = TautologyStr.Replace(sql, " __TAUTO__ ");
 
-            foreach (Match m in TokenRegex.Matches(sql))
+            var matches = TokenRegex.Matches(sql);
+            var result  = new List<string>(matches.Count);
+
+            foreach (Match m in matches)
             {
                 var tok = m.Value;
 
-                if (tok == "__TAUTO__")             { yield return "TAUTOLOGY"; continue; }
+                if (tok == "__TAUTO__")             { result.Add("TAUTOLOGY"); continue; }
                 if (tok.StartsWith("--") ||
-                    tok.StartsWith("/*"))           { yield return "COMMENT";   continue; }
-                if (tok.StartsWith("'"))            { yield return "STRING";    continue; }
-                if (tok == "*")                     { yield return "STAR";      continue; }
-                if (tok == "=")                     { yield return "EQUALS";    continue; }
+                    tok.StartsWith("/*"))           { result.Add("COMMENT");   continue; }
+                if (tok.StartsWith("'"))            { result.Add("STRING");    continue; }
+                if (tok == "*")                     { result.Add("STAR");      continue; }
+                if (tok == "=")                     { result.Add("EQUALS");    continue; }
 
-                yield return tok.ToUpperInvariant() switch
+                result.Add(tok.ToUpperInvariant() switch
                 {
                     "SELECT"    => "SELECT",
                     "UNION"     => "UNION",
@@ -52,8 +59,10 @@ namespace LogGuardV2.src.Engine
                     "TO"        => "TO",
                     "LIMIT"     => "LIMIT",
                     _           => "IDENT"
-                };
+                });
             }
+
+            return result;
         }
     }
 }
