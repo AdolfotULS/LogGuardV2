@@ -128,10 +128,15 @@ namespace LogGuardV2
         private long _totalEvents;
         private long _fatalErrorCount;
         private long _injectedCount;
-        private long _durationSumMs;
+        private long _durationSumUs;   // microseconds for precision; avoids (long)double truncation
+        private long _durationCount;   // entries with non-zero duration (denominator for avg)
         private long _eventsThisSecond;
         private long _injectedThisSecond;
         private long _fatalThisSecond;
+
+        // Fatal-per-minute sliding window — written on thread-pool under lock
+        private readonly Queue<DateTimeOffset> _fatalMinWindow = new();
+        private readonly object _fatalWindowLock = new();
 
         // Sparkline history (48 points, 1s each)
         private readonly System.Collections.Generic.Queue<double> _epsHistory  = new();
@@ -169,8 +174,10 @@ namespace LogGuardV2
             Interlocked.Exchange(ref _totalEvents,      0);
             Interlocked.Exchange(ref _fatalErrorCount,  0);
             Interlocked.Exchange(ref _injectedCount,    0);
-            Interlocked.Exchange(ref _durationSumMs,    0);
+            Interlocked.Exchange(ref _durationSumUs,    0);
+            Interlocked.Exchange(ref _durationCount,    0);
             Interlocked.Exchange(ref _eventsThisSecond, 0);
+            lock (_fatalWindowLock) _fatalMinWindow.Clear();
 
             var settings  = ReadSettingsFromForm();
             var nfaFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NFA");
@@ -217,13 +224,24 @@ namespace LogGuardV2
             {
                 Interlocked.Increment(ref _fatalErrorCount);
                 Interlocked.Increment(ref _fatalThisSecond);
+                lock (_fatalWindowLock)
+                {
+                    var now = DateTimeOffset.UtcNow;
+                    _fatalMinWindow.Enqueue(now);
+                    while (_fatalMinWindow.Count > 0 && now - _fatalMinWindow.Peek() > TimeSpan.FromMinutes(1))
+                        _fatalMinWindow.Dequeue();
+                }
             }
             if (entry.IsInjected)
             {
                 Interlocked.Increment(ref _injectedCount);
                 Interlocked.Increment(ref _injectedThisSecond);
             }
-            Interlocked.Add(ref _durationSumMs, (long)entry.Duration);
+            if (entry.Duration > 0)
+            {
+                Interlocked.Add(ref _durationSumUs, (long)(entry.Duration * 1000));
+                Interlocked.Increment(ref _durationCount);
+            }
 
             Dispatcher.InvokeAsync(() =>
             {
@@ -244,14 +262,17 @@ namespace LogGuardV2
 
         private void RefreshKpis()
         {
+            _liveWatcher?.FlushStale();
+
             var eps      = Interlocked.Exchange(ref _eventsThisSecond,   0);
             var epsInj   = Interlocked.Exchange(ref _injectedThisSecond, 0);
             var epsFat   = Interlocked.Exchange(ref _fatalThisSecond,    0);
             var total    = Interlocked.Read(ref _totalEvents);
             var errors   = Interlocked.Read(ref _fatalErrorCount);
             var injected = Interlocked.Read(ref _injectedCount);
-            var durSum   = Interlocked.Read(ref _durationSumMs);
-            var avg      = total > 0 ? (double)durSum / total : 0.0;
+            var durSumUs = Interlocked.Read(ref _durationSumUs);
+            var durCount = Interlocked.Read(ref _durationCount);
+            var avg      = durCount > 0 ? durSumUs / 1000.0 / durCount : 0.0;
             var uptime   = DateTime.UtcNow - _appStart;
 
             KpiEventsPerSec.Text = eps.ToString("N0");
@@ -259,6 +280,63 @@ namespace LogGuardV2
             KpiInjected.Text     = injected.ToString("N0");
             KpiAvgDuration.Text  = avg.ToString("F1");
             KpiUptime.Text       = uptime.ToString(@"hh\:mm\:ss");
+
+            // ── KPI alert subtexts ────────────────────────────────────────────────
+
+            // EPS: trend vs 5m avg
+            if (_epsHistory.Count >= 2)
+            {
+                double avg5m    = _epsHistory.Average();
+                double delta    = eps - avg5m;
+                string arrow    = delta > 0 ? "▴" : delta < 0 ? "▾" : "—";
+                string pct      = avg5m > 0 ? $"{Math.Abs(delta / avg5m * 100):F0}%" : "—";
+                KpiEpsSubtext.Foreground = (Brush)(delta > avg5m * 0.5
+                    ? FindResource("WarnBrush") : FindResource("OkBrush"));
+                KpiEpsSubtext.Text = $"{arrow} {pct} vs 5m avg";
+            }
+            else
+            {
+                KpiEpsSubtext.Text = "— vs 5m avg";
+                KpiEpsSubtext.Foreground = (Brush)FindResource("OkBrush");
+            }
+
+            // Fatal: count in last 60s from sliding window
+            int fatalLastMin;
+            lock (_fatalWindowLock)
+            {
+                var now = DateTimeOffset.UtcNow;
+                while (_fatalMinWindow.Count > 0 && now - _fatalMinWindow.Peek() > TimeSpan.FromMinutes(1))
+                    _fatalMinWindow.Dequeue();
+                fatalLastMin = _fatalMinWindow.Count;
+            }
+            KpiFatalSubtext.Text = fatalLastMin == 0
+                ? "0 in last min"
+                : $"▴ {fatalLastMin} in last min";
+            KpiFatalSubtext.Foreground = (Brush)FindResource(fatalLastMin >= 10 ? "DangerBrush"
+                : fatalLastMin >= 3 ? "WarnBrush" : "OkBrush");
+
+            // Injected: total + rate context
+            KpiInjSubtext.Text = $"{injected:N0} total · session";
+            KpiInjSubtext.Foreground = (Brush)FindResource(injected >= 10 ? "DangerBrush"
+                : injected >= 1 ? "WarnBrush" : "TextMuteBrush");
+
+            // Duration: p95 from collected entries
+            double[] durations = _entries.Select(e => e.Duration).Where(d => d > 0).ToArray();
+            if (durations.Length >= 5)
+            {
+                double p95 = durations.OrderBy(d => d).ToArray()[(int)(durations.Length * 0.95)];
+                KpiDurSubtext.Text = $"p95 {p95:F0}ms";
+                KpiDurSubtext.Foreground = (Brush)FindResource(p95 >= 1000 ? "DangerBrush"
+                    : p95 >= 200 ? "WarnBrush" : "TextMuteBrush");
+            }
+            else
+            {
+                KpiDurSubtext.Text = "p95 —ms";
+                KpiDurSubtext.Foreground = (Brush)FindResource("TextMuteBrush");
+            }
+
+            // Uptime: start time
+            KpiUptimeSubtext.Text = $"since {_appStart:HH:mm} UTC";
 
             PushHistory(_epsHistory, eps);
             PushHistory(_injHistory, epsInj);

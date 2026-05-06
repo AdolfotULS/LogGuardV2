@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
@@ -9,13 +9,13 @@ namespace LogGuardV2.src.Engine
 {
     /// <summary>
     /// Orchestrates live log monitoring:
-    ///   FileWatcherLive -> PostgreSqlLogParser -> SqlTokenizer -> NfaEngine[] -> LogEntry
+    ///   FileWatcherLive → PostgreSqlLogParser → SqlTokenizer → NfaEngine[] → LogEntry
     ///
-    /// File I/O and NFA processing are decoupled via a Channel. OnNewLines (called
-    /// under the file-watcher lock) accumulates multi-line entries and enqueues them;
-    /// a dedicated consumer task performs all CPU-heavy work independently.
+    /// File I/O and NFA processing are decoupled via a Channel: OnNewLines (called
+    /// under the file-watcher lock) only accumulates multi-line entries and enqueues
+    /// them; a dedicated consumer task performs all CPU-heavy work independently.
     ///
-    /// Raises EntryDetected on the consumer task thread.
+    /// Raises <see cref="EntryDetected"/> on the consumer task thread.
     /// Callers must dispatch to the UI thread before touching UI objects.
     /// </summary>
     internal sealed class LogLiveWatcher : IDisposable
@@ -24,34 +24,26 @@ namespace LogGuardV2.src.Engine
         private readonly string          _nfaFolder;
         private List<NfaEngine>          _engines;
 
-        // AllowSynchronousContinuations = false: prevents reader from running inline on writer thread.
-        // SingleWriter = false: FlushStale (UI thread) and OnNewLines (timer thread) both write.
+        // Decouples file-watcher I/O from NFA processing.
+        // SingleWriter = OnNewLines (always under _readLock), SingleReader = consumer task.
         private readonly Channel<string> _entryChannel = Channel.CreateUnbounded<string>(
             new UnboundedChannelOptions
             {
                 SingleReader                  = true,
-                SingleWriter                  = false,
+                SingleWriter                  = true,
                 AllowSynchronousContinuations = false
             });
         private readonly Task _consumer;
 
-        // All dictionaries: consumer-task-only access (single reader), plain Dictionary safe.
-
-        // C1: PID -> (User, Database, Host) built from ConnectionAuthorized
+        // C1: PID → (User, Database, Host) — only accessed from consumer task (single reader)
         private readonly Dictionary<int, (string User, string Database, string Host)> _pidCtx = new();
 
-        // C1: host staging - stored on ConnectionReceived, merged into _pidCtx on ConnectionAuthorized
-        private readonly Dictionary<int, string> _pidHost = new();
-
-        // D1: Statement entry buffered per PID awaiting its paired Duration line
-        private readonly Dictionary<int, (LogEntry Entry, long CreatedTick)> _pidPending = new();
-
-        // A3: brute-force sliding window
+        // A3: brute-force sliding window — only accessed from consumer task
         private readonly Dictionary<string, Queue<DateTimeOffset>> _bfWindow = new();
         private const int BfThreshold = 5;
         private static readonly TimeSpan BfWindowDuration = TimeSpan.FromMinutes(1);
 
-        // M5: multi-line accumulation - only accessed from OnNewLines (under file-watcher lock)
+        // M5: pending multi-line accumulation — only accessed from OnNewLines (under file-watcher lock)
         private string? _pendingLine;
 
         public int EngineCount => _engines.Count;
@@ -70,16 +62,11 @@ namespace LogGuardV2.src.Engine
 
         public void Start(bool replayFromStart = false) => _fileWatcher.Start(replayFromStart);
 
-        // A5: hot reload - swaps engine list atomically
+        // A5: hot reload — swaps engine list atomically
         public void ReloadEngines()
             => Interlocked.Exchange(ref _engines, NfaLoader.LoadAll(_nfaFolder));
 
-        // D1: flush pending entries older than maxAgeMs that never received a Duration line.
-        // Called from UI thread (RefreshKpis) - safe because SingleWriter = false.
-        public void FlushStale(long maxAgeMs = 2000)
-            => _entryChannel.Writer.TryWrite($"\x00FLUSH:{maxAgeMs}");
-
-        // -- Pipeline: producer side (runs under FileWatcherLive._readLock) -------
+        // ── Pipeline: producer side (runs under FileWatcherLive._readLock) ─────────
 
         private void OnNewLines(IReadOnlyList<string> lines)
         {
@@ -99,114 +86,40 @@ namespace LogGuardV2.src.Engine
 
                 _pendingLine = raw;
             }
-
-            // Flush the last pending line at end of every batch.
-            // PostgreSQL Duration lines have no continuations so this is safe.
-            // Without this flush, Duration lines stay stuck until the next batch arrives,
-            // preventing statement entries from ever firing.
-            if (_pendingLine != null)
-            {
-                writer.TryWrite(_pendingLine);
-                _pendingLine = null;
-            }
         }
 
-        // -- Pipeline: consumer side (dedicated background task) ------------------
+        // ── Pipeline: consumer side (dedicated background task) ───────────────────
 
         private async Task ConsumeEntries()
         {
             await foreach (var line in _entryChannel.Reader.ReadAllAsync().ConfigureAwait(false))
-            {
-                try
-                {
-                    if (line.StartsWith("\x00FLUSH:", StringComparison.Ordinal))
-                    {
-                        if (long.TryParse(line.AsSpan(7), out var maxAge))
-                            DoFlushStale(maxAge);
-                    }
-                    else
-                    {
-                        ProcessLine(line);
-                    }
-                }
-                catch
-                {
-                    // Swallow per-line exceptions - consumer task must never die.
-                }
-            }
-        }
-
-        private void DoFlushStale(long maxAgeMs)
-        {
-            var now     = Environment.TickCount64;
-            var toFire  = new List<LogEntry>();
-            var toEvict = new List<int>();
-
-            foreach (var kvp in _pidPending)
-            {
-                if (now - kvp.Value.CreatedTick >= maxAgeMs)
-                {
-                    toFire.Add(kvp.Value.Entry);
-                    toEvict.Add(kvp.Key);
-                }
-            }
-
-            foreach (var pid in toEvict)  _pidPending.Remove(pid);
-            foreach (var entry in toFire) EntryDetected?.Invoke(entry);
+                ProcessLine(line);
         }
 
         private void ProcessLine(string line)
         {
-            if (string.IsNullOrEmpty(line)) return;
-            if (!PostgreSqlLogParser.TryParse(line, out var pg) || pg is null) return;
-
-            // C1: stage host from ConnectionReceived for later correlation
-            if (pg.Type == PgLogLineType.ConnectionReceived && pg.Host != null)
-            {
-                _pidHost[ParsePid(pg.ProcessId)] = pg.Host;
+            if (!PostgreSqlLogParser.TryParse(line, out var pg) || pg is null)
                 return;
-            }
 
-            // C1: build PID context from ConnectionAuthorized, merging staged host
+            // C1: track PID context from connection events
             if (pg.Type == PgLogLineType.ConnectionAuthorized && pg.User != null)
             {
-                var pid = ParsePid(pg.ProcessId);
-                _pidHost.Remove(pid, out var stagedHost);
-                _pidCtx[pid] = (pg.User, pg.Database ?? "", stagedHost ?? pg.Host ?? "");
+                _pidCtx[ParsePid(pg.ProcessId)] = (pg.User, pg.Database ?? "", pg.Host ?? "");
                 return;
             }
 
             // C1: free PID context on disconnect to bound dictionary growth
             if (pg.Type == PgLogLineType.Disconnection)
             {
-                var pid = ParsePid(pg.ProcessId);
-                _pidCtx.Remove(pid);
-                _pidHost.Remove(pid);
-                _pidPending.Remove(pid);
-                return;
-            }
-
-            // D1: Duration line pairs with the preceding Statement for this PID
-            if (pg.Type == PgLogLineType.Duration)
-            {
-                var pid = ParsePid(pg.ProcessId);
-                if (_pidPending.Remove(pid, out var pending))
-                {
-                    pending.Entry.Duration = pg.DurationMs ?? 0;
-                    EntryDetected?.Invoke(pending.Entry);
-                }
+                _pidCtx.Remove(ParsePid(pg.ProcessId));
                 return;
             }
 
             // B3: only run NFA on Statement entries (lines with actual SQL)
             if (pg.Type != PgLogLineType.Statement) return;
 
-            var pid2 = ParsePid(pg.ProcessId);
-            _pidCtx.TryGetValue(pid2, out var ctx);
-
-            // If a previous statement for this PID never got a Duration line, fire it now
-            if (_pidPending.Remove(pid2, out var orphan))
-                EntryDetected?.Invoke(orphan.Entry);
+            var pid = ParsePid(pg.ProcessId);
+            _pidCtx.TryGetValue(pid, out var ctx);
 
             var tokens        = SqlTokenizer.Tokenize(pg.Message);
             var matchedEngine = RunEngines(tokens);
@@ -219,24 +132,23 @@ namespace LogGuardV2.src.Engine
             }
 
             var level = matchedEngine != null
-                ? (!string.IsNullOrEmpty(matchedEngine.Severity) ? matchedEngine.Severity : pg.Severity).ToUpperInvariant()
+                ? matchedEngine.Severity.ToUpperInvariant()
                 : pg.Severity;
 
             var entry = new LogEntry
             {
                 Timestamp  = pg.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff UTC"),
-                Pid        = pid2,
+                Pid        = pid,
                 Level      = level,
                 UserHost   = $"{ctx.User ?? pg.Identity ?? "unknown"}@{ctx.Host ?? pg.Host ?? "unknown"}",
                 Database   = !string.IsNullOrEmpty(ctx.Database) ? ctx.Database : (pg.Database ?? ""),
                 Query      = pg.Message,
-                Duration   = 0,   // populated when the matching Duration line arrives
+                Duration   = pg.DurationMs ?? 0,
                 IsInjected = matchedEngine != null,
                 ThreatType = matchedEngine?.ThreatType ?? ""
             };
 
-            // D1: buffer until paired Duration line fires the entry
-            _pidPending[pid2] = (entry, Environment.TickCount64);
+            EntryDetected?.Invoke(entry);
         }
 
         // A3: sliding-window counter per attacker key
@@ -249,6 +161,7 @@ namespace LogGuardV2.src.Engine
             q.Enqueue(now);
             while (q.Count > 0 && now - q.Peek() > BfWindowDuration)
                 q.Dequeue();
+
             return q.Count >= BfThreshold;
         }
 
@@ -256,12 +169,12 @@ namespace LogGuardV2.src.Engine
         // tokenSet is lazily computed and shared across all absent-token checks in one call.
         private NfaEngine? RunEngines(List<string> tokens)
         {
-            var engines = _engines; // snapshot - ReloadEngines may swap field concurrently
+            var engines = _engines; // snapshot — ReloadEngines may swap field concurrently
             if (engines.Count == 0) return null;
 
             HashSet<string>? tokenSet = null;
 
-            // Sequential path for small engine counts
+            // Sequential path for small engine counts — avoids Parallel.ForEach overhead
             if (engines.Count <= 4)
             {
                 foreach (var e in engines)
@@ -280,7 +193,7 @@ namespace LogGuardV2.src.Engine
                 return null;
             }
 
-            // Parallel path for larger engine sets - pre-compute tokenSet once for all threads
+            // Parallel path for larger engine sets — pre-compute tokenSet once for all threads
             tokenSet = new HashSet<string>(tokens);
             NfaEngine? found = null;
             Parallel.ForEach(engines, (engine, state) =>

@@ -278,7 +278,7 @@
                                                    Foreground="{StaticResource TextMuteBrush}" Margin="0,0,0,6"/>
                                         <TextBlock x:Name="KpiFatalError" Text="0" FontFamily="Consolas" FontSize="20" FontWeight="SemiBold"
                                                    Foreground="{StaticResource DangerBrush}" Margin="0,0,0,6"/>
-                                        <TextBlock Text="▴ 4 in last minute" FontSize="11" Foreground="{StaticResource WarnBrush}"/>
+                                        <TextBlock x:Name="KpiFatalSubtext" Text="0 in last min" FontSize="11" Foreground="{StaticResource OkBrush}"/>
                                     </StackPanel>
                                 </Border>
                                 <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,1,0" Padding="14,12">
@@ -287,7 +287,7 @@
                                                    Foreground="{StaticResource TextMuteBrush}" Margin="0,0,0,6"/>
                                         <TextBlock x:Name="KpiInjected" Text="0" FontFamily="Consolas" FontSize="20" FontWeight="SemiBold"
                                                    Foreground="{StaticResource WarnBrush}" Margin="0,0,0,6"/>
-                                        <TextBlock Text="last 15m" FontSize="11" Foreground="{StaticResource TextMuteBrush}"/>
+                                        <TextBlock x:Name="KpiInjSubtext" Text="0 total · session" FontSize="11" Foreground="{StaticResource TextMuteBrush}"/>
                                     </StackPanel>
                                 </Border>
                                 <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,1,0" Padding="14,12">
@@ -301,7 +301,7 @@
                                                        Foreground="{StaticResource TextMuteBrush}"
                                                        VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                                         </StackPanel>
-                                        <TextBlock Text="p95 280ms" FontSize="11" Foreground="{StaticResource TextMuteBrush}"/>
+                                        <TextBlock x:Name="KpiDurSubtext" Text="p95 —ms" FontSize="11" Foreground="{StaticResource TextMuteBrush}"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Padding="14,12">
@@ -310,7 +310,7 @@
                                                    Foreground="{StaticResource TextMuteBrush}" Margin="0,0,0,6"/>
                                         <TextBlock x:Name="KpiUptime" Text="00:00:00" FontFamily="Consolas" FontSize="20" FontWeight="SemiBold"
                                                    Foreground="{StaticResource OkBrush}" Margin="0,0,0,6"/>
-                                        <TextBlock Text="since 09:14 UTC" FontSize="11" Foreground="{StaticResource TextMuteBrush}"/>
+                                        <TextBlock x:Name="KpiUptimeSubtext" Text="since — UTC" FontSize="11" Foreground="{StaticResource TextMuteBrush}"/>
                                     </StackPanel>
                                 </Border>
                             </UniformGrid>

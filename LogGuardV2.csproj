@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="srcBACKUP\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="NFA\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

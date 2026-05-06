@@ -1,0 +1,61 @@
+{
+  "profileId": "pgsql-discovery-v2",
+  "name": "Discovery - Schema Enumeration",
+  "version": "2.1.0",
+  "enabled": true,
+  "threatType": "DISCOVERY",
+  "target": {
+    "source": "PostgreSQL",
+    "inputField": "Query",
+    "tokenizer": "SqlTokenizer"
+  },
+  "alphabet": [
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "IDENT",
+    "STAR",
+    "INFORMATION_SCHEMA",
+    "SYSTEM_TABLE"
+  ],
+  "states": [
+    {
+      "id": "q0",
+      "isStart": true,
+      "isAccept": false
+    },
+    {
+      "id": "q_sel",
+      "isStart": false,
+      "isAccept": false
+    },
+    {
+      "id": "q_from",
+      "isStart": false,
+      "isAccept": false
+    },
+    {
+      "id": "q_disc",
+      "isStart": false,
+      "isAccept": true
+    }
+  ],
+  "transitions": [
+    { "from": "q0",     "symbol": "SELECT",             "to": "q_sel"   },
+    { "from": "q0",     "symbol": "INFORMATION_SCHEMA", "to": "q_disc"  },
+    { "from": "q0",     "symbol": "SYSTEM_TABLE",       "to": "q_disc"  },
+
+    { "from": "q_sel",  "symbol": "IDENT",              "to": "q_sel"   },
+    { "from": "q_sel",  "symbol": "STAR",               "to": "q_sel"   },
+    { "from": "q_sel",  "symbol": "FROM",               "to": "q_from"  },
+
+    { "from": "q_from", "symbol": "IDENT",              "to": "q_from"  },
+    { "from": "q_from", "symbol": "INFORMATION_SCHEMA", "to": "q_disc"  },
+    { "from": "q_from", "symbol": "SYSTEM_TABLE",       "to": "q_disc"  }
+  ],
+  "metadata": {
+    "severity": "Medium",
+    "description": "Detecta acceso a metadatos del sistema (information_schema, pg_shadow, pg_user, pg_roles, etc.) para reconocimiento de tablas y estructura de base de datos.",
+    "tags": [ "discovery", "recon", "information-schema", "system-table", "pg_shadow" ]
+  }
+}

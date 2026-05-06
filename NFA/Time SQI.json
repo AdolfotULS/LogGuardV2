@@ -1,0 +1,76 @@
+{
+  "profileId": "pgsql-time-sqli-v2",
+  "name": "SQL Injection - Time Based (pg_sleep / BENCHMARK)",
+  "version": "2.1.0",
+  "enabled": true,
+  "threatType": "SQLI",
+  "target": {
+    "source": "PostgreSQL",
+    "inputField": "Query",
+    "tokenizer": "SqlTokenizer"
+  },
+  "alphabet": [
+    "SELECT",
+    "IDENT",
+    "LPAREN",
+    "NUMBER",
+    "STRING",
+    "COMMA",
+    "RPAREN",
+    "SEMICOLON",
+    "SLEEP",
+    "BENCHMARK"
+  ],
+  "states": [
+    {
+      "id": "q0",
+      "isStart": true,
+      "isAccept": false
+    },
+    {
+      "id": "q_sel",
+      "isStart": false,
+      "isAccept": false
+    },
+    {
+      "id": "q_func",
+      "isStart": false,
+      "isAccept": false
+    },
+    {
+      "id": "q_arg",
+      "isStart": false,
+      "isAccept": false
+    },
+    {
+      "id": "q_alert",
+      "isStart": false,
+      "isAccept": true
+    }
+  ],
+  "transitions": [
+    { "from": "q0",     "symbol": "SELECT",    "to": "q_sel"   },
+    { "from": "q0",     "symbol": "SLEEP",     "to": "q_func"  },
+    { "from": "q0",     "symbol": "BENCHMARK", "to": "q_func"  },
+
+    { "from": "q_sel",  "symbol": "IDENT",     "to": "q_func"  },
+    { "from": "q_sel",  "symbol": "SLEEP",     "to": "q_func"  },
+    { "from": "q_sel",  "symbol": "BENCHMARK", "to": "q_func"  },
+
+    { "from": "q_func", "symbol": "LPAREN",    "to": "q_arg"   },
+
+    { "from": "q_arg",  "symbol": "NUMBER",    "to": "q_arg"   },
+    { "from": "q_arg",  "symbol": "STRING",    "to": "q_arg"   },
+    { "from": "q_arg",  "symbol": "IDENT",     "to": "q_arg"   },
+    { "from": "q_arg",  "symbol": "COMMA",     "to": "q_arg"   },
+    { "from": "q_arg",  "symbol": "LPAREN",    "to": "q_arg"   },
+    { "from": "q_arg",  "symbol": "RPAREN",    "to": "q_alert" },
+
+    { "from": "q_alert","symbol": "SEMICOLON", "to": "q_alert" }
+  ],
+  "metadata": {
+    "severity": "High",
+    "description": "Detecta intentos de pausa en la DB mediante SLEEP/pg_sleep() o BENCHMARK() para confirmar inyección ciega por tiempo.",
+    "tags": [ "sqli", "blind-time", "pg_sleep", "sleep", "benchmark" ]
+  }
+}
