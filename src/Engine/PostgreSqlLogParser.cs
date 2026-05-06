@@ -58,7 +58,7 @@ namespace LogGuardV2.src.Engine
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private static readonly Regex ConnectionReceivedRegex = new(
-            @"^connection received:\s+host=(?<host>\S+)\s+port=(?<port>\d+)$",
+            @"^connection received:\s+host=(?<host>\S+)(?:\s+port=(?<port>\d+))?$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private static readonly Regex ConnectionAuthenticatedRegex = new(
@@ -66,11 +66,11 @@ namespace LogGuardV2.src.Engine
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private static readonly Regex ConnectionAuthorizedRegex = new(
-            @"^connection authorized:\s+user=(?<user>[^\s]+)\s+database=(?<database>[^\s]+)\s+application_name=(?<application_name>.+)$",
+            @"^connection authorized:\s+user=(?<user>[^\s]+)\s+database=(?<database>[^\s]+)(?:\s+application_name=(?<application_name>.+))?$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private static readonly Regex DisconnectionRegex = new(
-            @"^disconnection:\s+session time:\s+(?<session_time>\S+)\s+user=(?<user>[^\s]+)\s+database=(?<database>[^\s]+)\s+host=(?<host>\S+)\s+port=(?<port>\d+)$",
+            @"^disconnection:\s+session time:\s+(?<session_time>\S+)\s+user=(?<user>[^\s]+)\s+database=(?<database>[^\s]+)\s+host=(?<host>\S+)(?:\s+port=(?<port>\d+))?$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         /// <summary>Fast check — does this line start a new log entry?</summary>

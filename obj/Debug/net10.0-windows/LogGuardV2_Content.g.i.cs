@@ -12,5 +12,6 @@
 [assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("nfa/exfiltration.json")]
 [assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("nfa/privilege%20escalation.json")]
 [assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("nfa/sql_injection.json")]
+[assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("logoguard.ico")]
 
 

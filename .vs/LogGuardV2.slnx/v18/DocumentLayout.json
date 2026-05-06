@@ -1,7 +1,12 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|c:\\users\\winteros\\source\\repos\\logguardv2\\logguardv2.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|",
+      "RelativeMoniker": "D:0:0:{D783F68C-C41C-0BBA-5E5F-D78D77BEBDF3}|LogGuardV2.csproj|solutionrelative:logguardv2.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -9,11 +14,23 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": -1,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:1:0:{e8b06f52-6d01-11d2-aa7d-00c04f990343}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "LogGuardV2",
+              "DocumentMoniker": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\LogGuardV2.csproj",
+              "RelativeDocumentMoniker": "LogGuardV2.csproj",
+              "ToolTip": "C:\\Users\\WinterOS\\source\\repos\\LogGuardV2\\LogGuardV2.csproj",
+              "RelativeToolTip": "LogGuardV2.csproj",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-05-06T04:36:16.381Z",
+              "EditorCaption": ""
             }
           ]
         }

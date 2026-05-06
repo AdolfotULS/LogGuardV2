@@ -6,12 +6,17 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>LOGOGUARD.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <Content Include="NFA\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="LOGOGUARD.ico" />
   </ItemGroup>
 
 </Project>

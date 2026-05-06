@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
@@ -24,6 +25,7 @@ namespace LogGuardV2.src.Engine
         private readonly string          _nfaFolder;
         private List<NfaEngine>          _engines;
 
+<<<<<<< Updated upstream
         // Decouples file-watcher I/O from NFA processing.
         // SingleWriter = OnNewLines (always under _readLock), SingleReader = consumer task.
         private readonly Channel<string> _entryChannel = Channel.CreateUnbounded<string>(
@@ -45,6 +47,24 @@ namespace LogGuardV2.src.Engine
 
         // M5: pending multi-line accumulation — only accessed from OnNewLines (under file-watcher lock)
         private string? _pendingLine;
+=======
+        // C1: PID → (User, Database, Host) from ConnectionAuthorized entries
+        private readonly ConcurrentDictionary<int, (string User, string Database, string Host)> _pidCtx = new();
+
+        // Host staging: PID → host from ConnectionReceived, consumed on ConnectionAuthorized
+        private readonly ConcurrentDictionary<int, string> _pidHost = new();
+
+        // D1: PID → buffered statement entry awaiting its paired Duration line
+        private readonly ConcurrentDictionary<int, (LogEntry Entry, long CreatedTick)> _pidPending = new();
+
+        // A3: brute-force sliding window — key = "user@host"
+        private readonly ConcurrentDictionary<string, Queue<DateTimeOffset>> _bfWindow = new();
+        private const int BfThreshold = 5;
+        private static readonly TimeSpan BfWindowDuration = TimeSpan.FromMinutes(1);
+
+        // M5: pending multi-line accumulation
+        private volatile string? _pendingLine;
+>>>>>>> Stashed changes
 
         public int EngineCount => _engines.Count;
 
@@ -66,7 +86,25 @@ namespace LogGuardV2.src.Engine
         public void ReloadEngines()
             => Interlocked.Exchange(ref _engines, NfaLoader.LoadAll(_nfaFolder));
 
+<<<<<<< Updated upstream
         // ── Pipeline: producer side (runs under FileWatcherLive._readLock) ─────────
+=======
+        // D1: flush pending entries older than maxAgeMs that never received a Duration line
+        public void FlushStale(long maxAgeMs = 2000)
+        {
+            var now = Environment.TickCount64;
+            foreach (var kvp in _pidPending)
+            {
+                if (now - kvp.Value.CreatedTick >= maxAgeMs)
+                {
+                    if (_pidPending.TryRemove(kvp.Key, out var pending))
+                        EntryDetected?.Invoke(pending.Entry);
+                }
+            }
+        }
+
+        // ── Pipeline ──────────────────────────────────────────────────────────────
+>>>>>>> Stashed changes
 
         private void OnNewLines(IReadOnlyList<string> lines)
         {
@@ -98,12 +136,21 @@ namespace LogGuardV2.src.Engine
 
         private void ProcessLine(string line)
         {
+            if (string.IsNullOrEmpty(line)) return;
             if (!PostgreSqlLogParser.TryParse(line, out var pg) || pg is null)
                 return;
 
-            // C1: track PID context from connection events
+            // C1: stage host from ConnectionReceived for later correlation
+            if (pg.Type == PgLogLineType.ConnectionReceived && pg.Host != null)
+            {
+                _pidHost[ParsePid(pg.ProcessId)] = pg.Host;
+                return;
+            }
+
+            // C1: build PID context from ConnectionAuthorized, merging staged host
             if (pg.Type == PgLogLineType.ConnectionAuthorized && pg.User != null)
             {
+<<<<<<< Updated upstream
                 _pidCtx[ParsePid(pg.ProcessId)] = (pg.User, pg.Database ?? "", pg.Host ?? "");
                 return;
             }
@@ -112,6 +159,23 @@ namespace LogGuardV2.src.Engine
             if (pg.Type == PgLogLineType.Disconnection)
             {
                 _pidCtx.Remove(ParsePid(pg.ProcessId));
+=======
+                var pid = ParsePid(pg.ProcessId);
+                _pidHost.TryRemove(pid, out var stagedHost);
+                _pidCtx[pid] = (pg.User, pg.Database ?? "", stagedHost ?? pg.Host ?? "");
+                return;
+            }
+
+            // D1: Duration line pairs with the previous Statement for this PID
+            if (pg.Type == PgLogLineType.Duration)
+            {
+                var pid = ParsePid(pg.ProcessId);
+                if (_pidPending.TryRemove(pid, out var pending))
+                {
+                    pending.Entry.Duration = pg.DurationMs ?? 0;
+                    EntryDetected?.Invoke(pending.Entry);
+                }
+>>>>>>> Stashed changes
                 return;
             }
 
@@ -121,7 +185,15 @@ namespace LogGuardV2.src.Engine
             var pid = ParsePid(pg.ProcessId);
             _pidCtx.TryGetValue(pid, out var ctx);
 
+<<<<<<< Updated upstream
             var tokens        = SqlTokenizer.Tokenize(pg.Message);
+=======
+            // If a previous statement for this PID never got a Duration line, fire it now
+            if (_pidPending.TryRemove(pid2, out var orphan))
+                EntryDetected?.Invoke(orphan.Entry);
+
+            var tokens        = SqlTokenizer.Tokenize(pg.Message).ToList();
+>>>>>>> Stashed changes
             var matchedEngine = RunEngines(tokens);
 
             // A3: brute-force requires rate confirmation, not just pattern match
@@ -132,7 +204,7 @@ namespace LogGuardV2.src.Engine
             }
 
             var level = matchedEngine != null
-                ? matchedEngine.Severity.ToUpperInvariant()
+                ? (matchedEngine.Severity ?? pg.Severity).ToUpperInvariant()
                 : pg.Severity;
 
             var entry = new LogEntry
@@ -143,26 +215,28 @@ namespace LogGuardV2.src.Engine
                 UserHost   = $"{ctx.User ?? pg.Identity ?? "unknown"}@{ctx.Host ?? pg.Host ?? "unknown"}",
                 Database   = !string.IsNullOrEmpty(ctx.Database) ? ctx.Database : (pg.Database ?? ""),
                 Query      = pg.Message,
-                Duration   = pg.DurationMs ?? 0,
+                Duration   = 0,   // set when Duration line arrives
                 IsInjected = matchedEngine != null,
                 ThreatType = matchedEngine?.ThreatType ?? ""
             };
 
-            EntryDetected?.Invoke(entry);
+            // D1: buffer until paired Duration line fires the entry
+            _pidPending[pid2] = (entry, Environment.TickCount64);
         }
 
         // A3: sliding-window counter per attacker key
         private bool IsBruteForce(string key)
         {
             var now = DateTimeOffset.UtcNow;
-            if (!_bfWindow.TryGetValue(key, out var q))
-                _bfWindow[key] = q = new Queue<DateTimeOffset>();
+            var q   = _bfWindow.GetOrAdd(key, _ => new Queue<DateTimeOffset>());
 
-            q.Enqueue(now);
-            while (q.Count > 0 && now - q.Peek() > BfWindowDuration)
-                q.Dequeue();
-
-            return q.Count >= BfThreshold;
+            lock (q)
+            {
+                q.Enqueue(now);
+                while (q.Count > 0 && now - q.Peek() > BfWindowDuration)
+                    q.Dequeue();
+                return q.Count >= BfThreshold;
+            }
         }
 
         // M2: returns first matched engine or null.
