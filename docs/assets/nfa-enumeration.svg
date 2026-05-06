@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 290" font-family="system-ui,-apple-system,sans-serif">
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#374151"/>
+    </marker>
+  </defs>
+
+  <rect width="780" height="290" fill="#f8fafc" rx="10" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="390" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">NFA: Discovery — Schema Enumeration (pgsql-discovery-v2)</text>
+  <text x="390" y="48" text-anchor="middle" font-size="11" fill="#64748b">Severity: Medium · ThreatType: DISCOVERY · Targets: information_schema · pg_shadow · pg_user · pg_roles · pg_authid</text>
+
+  <!-- Entry arrow -->
+  <line x1="24" y1="145" x2="56" y2="145" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- q0 START -->
+  <circle cx="86" cy="145" r="28" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="86" y="141" text-anchor="middle" font-size="11" font-weight="700" fill="white">q0</text>
+  <text x="86" y="154" text-anchor="middle" font-size="9" fill="#bfdbfe">start</text>
+
+  <!-- q0→q_sel: SELECT (right) -->
+  <line x1="114" y1="145" x2="212" y2="145" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="130" y="132" width="66" height="14" fill="white" rx="3"/>
+  <text x="163" y="142" text-anchor="middle" font-size="10" fill="#1e293b">SELECT</text>
+
+  <!-- q0→q_disc: INFO_SCHEMA / SYSTEM_TABLE (shortcut arc below) -->
+  <path d="M96,170 C170,230 500,230 548,170" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#a)"/>
+  <rect x="240" y="222" width="192" height="14" fill="white" rx="3"/>
+  <text x="336" y="232" text-anchor="middle" font-size="9" fill="#dc2626">INFORMATION_SCHEMA · SYSTEM_TABLE</text>
+
+  <!-- q_sel -->
+  <circle cx="242" cy="145" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="242" y="141" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_sel</text>
+  <text x="242" y="154" text-anchor="middle" font-size="9" fill="#e5e7eb">after SELECT</text>
+
+  <!-- q_sel self-loop: IDENT / STAR -->
+  <path d="M230,117 C222,78 262,78 254,117" fill="none" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="220" y="70" width="72" height="14" fill="white" rx="3"/>
+  <text x="256" y="80" text-anchor="middle" font-size="9" fill="#374151">IDENT · STAR</text>
+
+  <!-- q_sel→q_from: FROM -->
+  <line x1="270" y1="145" x2="378" y2="145" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="285" y="132" width="80" height="14" fill="white" rx="3"/>
+  <text x="325" y="142" text-anchor="middle" font-size="10" fill="#1e293b">FROM</text>
+
+  <!-- q_from -->
+  <circle cx="408" cy="145" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="408" y="141" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_from</text>
+  <text x="408" y="154" text-anchor="middle" font-size="9" fill="#e5e7eb">after FROM</text>
+
+  <!-- q_from self-loop: IDENT -->
+  <path d="M396,117 C388,78 428,78 420,117" fill="none" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="388" y="70" width="44" height="14" fill="white" rx="3"/>
+  <text x="410" y="80" text-anchor="middle" font-size="9" fill="#374151">IDENT</text>
+
+  <!-- q_from→q_disc: INFO_SCHEMA / SYSTEM_TABLE -->
+  <line x1="436" y1="145" x2="544" y2="145" stroke="#dc2626" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="439" y="120" width="102" height="22" fill="white" rx="3"/>
+  <text x="490" y="130" text-anchor="middle" font-size="9" fill="#dc2626">INFO_SCHEMA</text>
+  <text x="490" y="142" text-anchor="middle" font-size="9" fill="#dc2626">SYSTEM_TABLE</text>
+
+  <!-- q_disc ACCEPT (double ring) -->
+  <circle cx="582" cy="145" r="34" fill="none" stroke="#10b981" stroke-width="2"/>
+  <circle cx="582" cy="145" r="28" fill="#10b981" stroke="#059669" stroke-width="2"/>
+  <text x="582" y="141" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_disc</text>
+  <text x="582" y="154" text-anchor="middle" font-size="9" fill="#d1fae5">ACCEPT</text>
+
+  <!-- Targets box -->
+  <rect x="628" y="80" width="132" height="110" rx="7" fill="#fef3c7" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="694" y="98" text-anchor="middle" font-size="10" font-weight="700" fill="#78350f">Tokens mapped to</text>
+  <text x="694" y="111" text-anchor="middle" font-size="10" font-weight="700" fill="#78350f">INFORMATION_SCHEMA:</text>
+  <text x="694" y="126" text-anchor="middle" font-size="9" fill="#92400e">information_schema</text>
+  <text x="694" y="139" text-anchor="middle" font-size="10" font-weight="700" fill="#78350f">Tokens mapped to</text>
+  <text x="694" y="152" text-anchor="middle" font-size="10" font-weight="700" fill="#78350f">SYSTEM_TABLE:</text>
+  <text x="694" y="165" text-anchor="middle" font-size="9" fill="#92400e">pg_shadow · pg_user</text>
+  <text x="694" y="178" text-anchor="middle" font-size="9" fill="#92400e">pg_roles · pg_authid</text>
+
+  <!-- note -->
+  <rect x="60" y="218" width="700" height="58" rx="7" fill="#fef3c7" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="90" y="234" font-size="10" font-weight="700" fill="#78350f">Direct match (q0→q_disc):   SELECT * FROM information_schema.tables</text>
+  <text x="90" y="248" font-size="10" fill="#92400e">Tokens: SELECT STAR FROM INFORMATION_SCHEMA IDENT → q_from gets INFO_SCHEMA → q_disc [ACCEPT]</text>
+  <text x="90" y="264" font-size="10" fill="#92400e">Also catches:   SELECT usename FROM pg_shadow   →   FROM SYSTEM_TABLE → q_disc [ACCEPT]</text>
+</svg>

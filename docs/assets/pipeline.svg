@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 920" font-family="system-ui,-apple-system,sans-serif">
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#64748b"/>
+    </marker>
+    <marker id="r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#dc2626"/>
+    </marker>
+  </defs>
+
+  <rect width="780" height="920" fill="#f8fafc" rx="10" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="390" y="36" text-anchor="middle" font-size="17" font-weight="700" fill="#0f172a">LogGuard V2 — Full Processing Pipeline</text>
+
+  <!-- ══ STEP 1: Raw log line ══ -->
+  <rect x="60" y="58" width="660" height="44" rx="7" fill="#e0f2fe" stroke="#0ea5e9" stroke-width="1.5"/>
+  <text x="390" y="76" text-anchor="middle" font-size="11" font-weight="600" fill="#0c4a6e">PostgreSQL Log File (500ms poll)</text>
+  <text x="390" y="92" text-anchor="middle" font-size="10" fill="#0369a1" font-style="italic">2024-01-15 14:23:01.437 UTC [1984] LOG:  statement: SELECT * FROM users WHERE id=1 OR 1=1</text>
+
+  <line x1="390" y1="102" x2="390" y2="128" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ══ STEP 2: Multi-line buffering ══ -->
+  <rect x="60" y="132" width="660" height="56" rx="7" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
+  <text x="130" y="152" font-size="11" font-weight="600" fill="#713f12">OnNewLines() — Multi-line accumulation</text>
+  <text x="80" y="170" font-size="10" fill="#854d0e">LooksLikeHeader(line)?  ✓ → flush _pendingLine to Channel  ✗ → append to _pendingLine (DETAIL/HINT/CONTEXT)</text>
+  <text x="80" y="183" font-size="10" fill="#854d0e">End of batch → always flush _pendingLine (critical for Duration lines)</text>
+
+  <line x1="390" y1="188" x2="390" y2="212" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="310" y="192" width="160" height="14" fill="#f8fafc" rx="3"/>
+  <text x="390" y="203" text-anchor="middle" font-size="10" fill="#475569">Channel&lt;string&gt;.Writer.TryWrite</text>
+
+  <!-- ══ STEP 3: Parse ══ -->
+  <rect x="60" y="216" width="660" height="100" rx="7" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="130" y="236" font-size="11" font-weight="600" fill="#4c1d95">PostgreSqlLogParser.TryParse(line)</text>
+
+  <!-- Type branches -->
+  <rect x="80" y="244" width="140" height="30" rx="5" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+  <text x="150" y="261" text-anchor="middle" font-size="10" font-weight="600" fill="#3b0764">ConnectionReceived</text>
+  <text x="150" y="272" text-anchor="middle" font-size="9" fill="#4c1d95">→ _pidHost[pid]=host</text>
+
+  <rect x="240" y="244" width="140" height="30" rx="5" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+  <text x="310" y="261" text-anchor="middle" font-size="10" font-weight="600" fill="#3b0764">ConnectionAuthorized</text>
+  <text x="310" y="272" text-anchor="middle" font-size="9" fill="#4c1d95">→ _pidCtx[pid]=(u,db,h)</text>
+
+  <rect x="400" y="244" width="120" height="30" rx="5" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+  <text x="460" y="261" text-anchor="middle" font-size="10" font-weight="600" fill="#3b0764">Disconnection</text>
+  <text x="460" y="272" text-anchor="middle" font-size="9" fill="#4c1d95">→ evict all dicts</text>
+
+  <rect x="540" y="244" width="100" height="30" rx="5" fill="#c4b5fd" stroke="#7c3aed" stroke-width="1"/>
+  <text x="590" y="261" text-anchor="middle" font-size="10" font-weight="600" fill="#3b0764">Duration</text>
+  <text x="590" y="272" text-anchor="middle" font-size="9" fill="#4c1d95">→ pair pending</text>
+
+  <text x="80" y="305" font-size="10" fill="#5b21b6">Statement lines only → proceed to tokenizer ↓</text>
+
+  <line x1="390" y1="316" x2="390" y2="340" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ══ STEP 4: Duration pairing ══ -->
+  <rect x="440" y="316" width="280" height="60" rx="7" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="580" y="336" text-anchor="middle" font-size="10" font-weight="600" fill="#991b1b">Duration Pairing</text>
+  <text x="580" y="350" text-anchor="middle" font-size="9" fill="#991b1b">Duration line → _pidPending.Remove(pid)</text>
+  <text x="580" y="362" text-anchor="middle" font-size="9" fill="#991b1b">Set entry.Duration → fire EntryDetected</text>
+  <text x="580" y="374" text-anchor="middle" font-size="9" fill="#b91c1c">FlushStale(2000ms) → fire orphans</text>
+
+  <!-- ══ STEP 5: Tokenizer ══ -->
+  <rect x="60" y="344" width="360" height="130" rx="7" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
+  <text x="130" y="364" font-size="11" font-weight="600" fill="#713f12">SqlTokenizer.Tokenize(sql)</text>
+
+  <rect x="78" y="372" width="324" height="22" rx="4" fill="#fde68a" stroke="#d97706" stroke-width="1"/>
+  <text x="240" y="387" text-anchor="middle" font-size="10" fill="#78350f">Phase 1: Normalize — comments, 0x hex, %enc, \uXXXX, $$</text>
+
+  <rect x="78" y="398" width="324" height="22" rx="4" fill="#fde68a" stroke="#d97706" stroke-width="1"/>
+  <text x="240" y="413" text-anchor="middle" font-size="10" fill="#78350f">Phase 2: Tautologies — 1=1, 'a'='a', x=x → TAUTOLOGY</text>
+
+  <rect x="78" y="424" width="324" height="22" rx="4" fill="#fde68a" stroke="#d97706" stroke-width="1"/>
+  <text x="240" y="439" text-anchor="middle" font-size="10" fill="#78350f">Phase 3: State-machine scan — no regex, ReDoS-immune</text>
+
+  <rect x="78" y="450" width="324" height="22" rx="4" fill="#fde68a" stroke="#d97706" stroke-width="1"/>
+  <text x="240" y="465" text-anchor="middle" font-size="10" fill="#78350f">Phase 4: Fuse — UNION ALL→UNION_ALL, INTO OUTFILE→…</text>
+
+  <line x1="240" y1="474" x2="240" y2="498" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="165" y="477" width="150" height="14" fill="#f8fafc" rx="3"/>
+  <text x="240" y="488" text-anchor="middle" font-size="10" fill="#475569">List&lt;string&gt; tokens</text>
+
+  <!-- ══ STEP 6: NFA Engines ══ -->
+  <rect x="60" y="502" width="660" height="130" rx="7" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="130" y="522" font-size="11" font-weight="600" fill="#14532d">RunEngines(tokens)</text>
+  <text x="430" y="522" font-size="10" fill="#166534">≤4 engines: sequential · >4 engines: Parallel.ForEach + Break()</text>
+
+  <!-- Engine boxes -->
+  <rect x="80" y="530" width="100" height="36" rx="5" fill="#bbf7d0" stroke="#22c55e" stroke-width="1"/>
+  <text x="130" y="547" text-anchor="middle" font-size="10" font-weight="600" fill="#14532d">SQL_Injection</text>
+  <text x="130" y="559" text-anchor="middle" font-size="9" fill="#166534">SQLI · High</text>
+
+  <rect x="192" y="530" width="100" height="36" rx="5" fill="#bbf7d0" stroke="#22c55e" stroke-width="1"/>
+  <text x="242" y="547" text-anchor="middle" font-size="10" font-weight="600" fill="#14532d">Brute_Force</text>
+  <text x="242" y="559" text-anchor="middle" font-size="9" fill="#166534">BRUTE · Med</text>
+
+  <rect x="304" y="530" width="100" height="36" rx="5" fill="#bbf7d0" stroke="#22c55e" stroke-width="1"/>
+  <text x="354" y="547" text-anchor="middle" font-size="10" font-weight="600" fill="#14532d">Exfiltration</text>
+  <text x="354" y="559" text-anchor="middle" font-size="9" fill="#166534">EXFIL · High</text>
+
+  <rect x="416" y="530" width="100" height="36" rx="5" fill="#bbf7d0" stroke="#22c55e" stroke-width="1"/>
+  <text x="466" y="547" text-anchor="middle" font-size="10" font-weight="600" fill="#14532d">Priv. Escalation</text>
+  <text x="466" y="559" text-anchor="middle" font-size="9" fill="#166534">PRIVESC · Crit</text>
+
+  <rect x="528" y="530" width="100" height="36" rx="5" fill="#bbf7d0" stroke="#22c55e" stroke-width="1"/>
+  <text x="578" y="547" text-anchor="middle" font-size="10" font-weight="600" fill="#14532d">Enumeration</text>
+  <text x="578" y="559" text-anchor="middle" font-size="9" fill="#166534">DISC · Med</text>
+
+  <rect x="640" y="530" width="68" height="36" rx="5" fill="#bbf7d0" stroke="#22c55e" stroke-width="1"/>
+  <text x="674" y="547" text-anchor="middle" font-size="10" font-weight="600" fill="#14532d">Time SQI</text>
+  <text x="674" y="559" text-anchor="middle" font-size="9" fill="#166534">SQLI · High</text>
+
+  <!-- NFA algorithm note -->
+  <rect x="80" y="576" width="260" height="46" rx="5" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+  <text x="100" y="592" font-size="9" fill="#14532d" font-weight="600">NFA.Run() algorithm:</text>
+  <text x="100" y="605" font-size="9" fill="#166534">active ← startStates ∪ delta[prev][token]</text>
+  <text x="100" y="618" font-size="9" fill="#166534">if active ∩ acceptStates ≠ ∅ → match</text>
+
+  <rect x="360" y="576" width="340" height="46" rx="5" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="380" y="592" font-size="9" fill="#991b1b" font-weight="600">Post-match checks:</text>
+  <text x="380" y="605" font-size="9" fill="#991b1b">BRUTEFORCE → IsBruteForce(user@host) — 5+/60s</text>
+  <text x="380" y="618" font-size="9" fill="#991b1b">EXFIL → RequireAbsentTokens: [WHERE, LIMIT]</text>
+
+  <line x1="390" y1="632" x2="390" y2="658" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ══ STEP 7: Build LogEntry ══ -->
+  <rect x="60" y="662" width="660" height="70" rx="7" fill="#e0e7ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="130" y="682" font-size="11" font-weight="600" fill="#3730a3">Build LogEntry + buffer in _pidPending[pid]</text>
+  <text x="80" y="700" font-size="10" fill="#4338ca">Timestamp · Pid · Level (threat severity or pg severity) · UserHost (from _pidCtx) · Database · Query · Duration=0</text>
+  <text x="80" y="714" font-size="10" fill="#4338ca">IsInjected = matchedEngine != null · ThreatType = engine.ThreatType · CreatedTick = TickCount64</text>
+
+  <!-- Duration arrives arrow (right side loop) -->
+  <path d="M720,632 C760,650 760,700 720,718" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#r)"/>
+  <text x="765" y="675" text-anchor="middle" font-size="9" fill="#dc2626">Duration</text>
+  <text x="765" y="687" text-anchor="middle" font-size="9" fill="#dc2626">line pairs</text>
+  <text x="765" y="699" text-anchor="middle" font-size="9" fill="#dc2626">entry.Duration</text>
+  <text x="765" y="711" text-anchor="middle" font-size="9" fill="#dc2626">= DurationMs</text>
+
+  <line x1="390" y1="732" x2="390" y2="758" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="256" y="735" width="268" height="14" fill="#f8fafc" rx="3"/>
+  <text x="390" y="746" text-anchor="middle" font-size="10" fill="#475569">EntryDetected → Dispatcher.InvokeAsync → UI thread</text>
+
+  <!-- ══ STEP 8: UI ══ -->
+  <rect x="60" y="762" width="660" height="90" rx="7" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="130" y="782" font-size="11" font-weight="600" fill="#1e3a8a">MainWindow.OnLiveEntry() — UI Thread</text>
+
+  <rect x="80" y="792" width="160" height="48" rx="5" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1"/>
+  <text x="160" y="808" text-anchor="middle" font-size="9" font-weight="600" fill="#1e3a8a">Counters</text>
+  <text x="160" y="820" text-anchor="middle" font-size="9" fill="#1d4ed8">Interlocked: events,</text>
+  <text x="160" y="832" text-anchor="middle" font-size="9" fill="#1d4ed8">injected, fatal, dur</text>
+
+  <rect x="256" y="792" width="160" height="48" rx="5" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1"/>
+  <text x="336" y="808" text-anchor="middle" font-size="9" font-weight="600" fill="#1e3a8a">Sliding Window</text>
+  <text x="336" y="820" text-anchor="middle" font-size="9" fill="#1d4ed8">_fatalMinWindow</text>
+  <text x="336" y="832" text-anchor="middle" font-size="9" fill="#1d4ed8">lock + 60s queue</text>
+
+  <rect x="432" y="792" width="160" height="48" rx="5" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1"/>
+  <text x="512" y="808" text-anchor="middle" font-size="9" font-weight="600" fill="#1e3a8a">DataGrid Insert</text>
+  <text x="512" y="820" text-anchor="middle" font-size="9" fill="#1d4ed8">_entries.Insert(0)</text>
+  <text x="512" y="832" text-anchor="middle" font-size="9" fill="#1d4ed8">cap at 5 000</text>
+
+  <rect x="608" y="792" width="100" height="48" rx="5" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1"/>
+  <text x="658" y="808" text-anchor="middle" font-size="9" font-weight="600" fill="#1e3a8a">KPI Timer</text>
+  <text x="658" y="820" text-anchor="middle" font-size="9" fill="#1d4ed8">refresh 1s</text>
+  <text x="658" y="832" text-anchor="middle" font-size="9" fill="#1d4ed8">sparklines</text>
+
+  <!-- Bottom note -->
+  <text x="390" y="872" text-anchor="middle" font-size="9" fill="#94a3b8">End-to-end latency (log line → DataGrid): &lt; 5 ms typical · O(tokens × states) per engine per query</text>
+  <text x="390" y="885" text-anchor="middle" font-size="9" fill="#94a3b8">Consumer task never terminates — exceptions per-line are swallowed (try/catch in ConsumeEntries)</text>
+  <text x="390" y="898" text-anchor="middle" font-size="9" fill="#94a3b8">_pidCtx / _pidPending / _bfWindow — single-reader channel guarantees no concurrent access, zero locking</text>
+</svg>

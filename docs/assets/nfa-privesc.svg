@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 300" font-family="system-ui,-apple-system,sans-serif">
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#374151"/>
+    </marker>
+  </defs>
+
+  <rect width="820" height="300" fill="#f8fafc" rx="10" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="410" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">NFA: Privilege Escalation — Grant Superuser (pgsql-privesc-v1)</text>
+  <text x="410" y="48" text-anchor="middle" font-size="11" fill="#64748b">Severity: Critical · ThreatType: PRIVESC · Also matches REPLICATION, BYPASSRLS, CREATEROLE</text>
+
+  <!-- Entry arrow -->
+  <line x1="24" y1="130" x2="52" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- q0 START -->
+  <circle cx="82" cy="130" r="28" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="82" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="white">q0</text>
+  <text x="82" y="139" text-anchor="middle" font-size="9" fill="#bfdbfe">start</text>
+
+  <!-- q0→q_alter: ALTER -->
+  <line x1="110" y1="130" x2="178" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="115" y="117" width="58" height="14" fill="white" rx="3"/>
+  <text x="144" y="127" text-anchor="middle" font-size="10" fill="#1e293b">ALTER</text>
+
+  <!-- q_alter -->
+  <circle cx="208" cy="130" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="208" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_alter</text>
+  <text x="208" y="139" text-anchor="middle" font-size="9" fill="#e5e7eb">after ALTER</text>
+
+  <!-- q_alter→q_target: USER / ROLE -->
+  <line x1="236" y1="130" x2="314" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="237" y="117" width="76" height="14" fill="white" rx="3"/>
+  <text x="275" y="127" text-anchor="middle" font-size="10" fill="#1e293b">USER · ROLE</text>
+
+  <!-- q_target -->
+  <circle cx="344" cy="130" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="344" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_target</text>
+  <text x="344" y="139" text-anchor="middle" font-size="9" fill="#e5e7eb">USER|ROLE</text>
+
+  <!-- q_target→q_name: IDENT -->
+  <line x1="372" y1="130" x2="450" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="377" y="117" width="68" height="14" fill="white" rx="3"/>
+  <text x="411" y="127" text-anchor="middle" font-size="10" fill="#1e293b">IDENT</text>
+
+  <!-- q_name -->
+  <circle cx="480" cy="130" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="480" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_name</text>
+  <text x="480" y="139" text-anchor="middle" font-size="9" fill="#e5e7eb">username</text>
+
+  <!-- q_name→q_super: SUPERUSER (direct, top path) -->
+  <path d="M497,104 C530,62 640,62 670,100" fill="none" stroke="#dc2626" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="530" y="55" width="80" height="14" fill="white" rx="3"/>
+  <text x="570" y="65" text-anchor="middle" font-size="10" fill="#dc2626" font-weight="600">SUPERUSER</text>
+
+  <!-- q_name→q_with: WITH (bottom path) -->
+  <path d="M480,158 C480,210 580,210 580,180" fill="none" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="497" y="200" width="46" height="14" fill="white" rx="3"/>
+  <text x="520" y="210" text-anchor="middle" font-size="10" fill="#1e293b">WITH</text>
+
+  <!-- q_with -->
+  <circle cx="580" cy="210" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="580" y="206" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_with</text>
+  <text x="580" y="219" text-anchor="middle" font-size="9" fill="#e5e7eb">after WITH</text>
+
+  <!-- q_with→q_super: SUPERUSER -->
+  <path d="M604,196 C630,175 660,155 663,130" fill="none" stroke="#dc2626" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="622" y="172" width="80" height="14" fill="white" rx="3"/>
+  <text x="662" y="182" text-anchor="middle" font-size="10" fill="#dc2626" font-weight="600">SUPERUSER</text>
+
+  <!-- q_super ACCEPT CRITICAL (double ring, red) -->
+  <circle cx="700" cy="130" r="34" fill="none" stroke="#dc2626" stroke-width="2.5"/>
+  <circle cx="700" cy="130" r="28" fill="#dc2626" stroke="#b91c1c" stroke-width="2"/>
+  <text x="700" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_super</text>
+  <text x="700" y="139" text-anchor="middle" font-size="9" fill="#fecaca">ACCEPT</text>
+
+  <!-- critical badge -->
+  <rect x="740" y="110" width="68" height="22" rx="5" fill="#dc2626"/>
+  <text x="774" y="125" text-anchor="middle" font-size="10" font-weight="700" fill="white">CRITICAL</text>
+
+  <!-- note -->
+  <rect x="60" y="248" width="740" height="40" rx="7" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="90" y="264" font-size="10" font-weight="700" fill="#991b1b">Example:  ALTER USER postgres WITH SUPERUSER  →  ALTER USER IDENT WITH SUPERUSER  →  q_super [ACCEPT]</text>
+  <text x="90" y="279" font-size="10" fill="#b91c1c">SUPERUSER token also matches: REPLICATION · BYPASSRLS · CREATEROLE (keyword dict aliases → same token)</text>
+</svg>

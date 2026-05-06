@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1260 430" font-family="system-ui,-apple-system,sans-serif">
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#374151"/>
+    </marker>
+    <marker id="r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#dc2626"/>
+    </marker>
+  </defs>
+
+  <rect width="1260" height="430" fill="#f8fafc" rx="10" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="630" y="28" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">NFA: SQL Injection — Tautology · UNION · Time-based · Discovery · OR-bypass (pgsql-sqli-v2)</text>
+  <text x="630" y="46" text-anchor="middle" font-size="10" fill="#64748b">Severity: High · ThreatType: SQLI · 10 states · 35+ transitions · 7 attack sub-patterns in one automaton</text>
+
+  <!-- ══ MAIN CHAIN (top row, y=130) ══ -->
+
+  <!-- Entry arrow -->
+  <line x1="20" y1="130" x2="48" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- q0 START -->
+  <circle cx="78" cy="130" r="28" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="78" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="white">q0</text>
+  <text x="78" y="139" text-anchor="middle" font-size="9" fill="#bfdbfe">start</text>
+
+  <!-- q0→q_prefix: SELECT -->
+  <line x1="106" y1="130" x2="184" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="109" y="117" width="72" height="14" fill="white" rx="3"/>
+  <text x="145" y="127" text-anchor="middle" font-size="10" fill="#1e293b">SELECT</text>
+
+  <!-- q_prefix -->
+  <circle cx="214" cy="130" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="214" y="126" text-anchor="middle" font-size="10" font-weight="700" fill="white">q_prefix</text>
+  <text x="214" y="139" text-anchor="middle" font-size="9" fill="#e5e7eb">cols</text>
+
+  <!-- q_prefix self-loop: IDENT/STAR -->
+  <path d="M202,102 C194,64 234,64 226,102" fill="none" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="188" y="56" width="72" height="14" fill="white" rx="3"/>
+  <text x="224" y="66" text-anchor="middle" font-size="9" fill="#374151">IDENT · STAR</text>
+
+  <!-- q_prefix→q_tbl: FROM -->
+  <line x1="242" y1="130" x2="320" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="247" y="117" width="66" height="14" fill="white" rx="3"/>
+  <text x="280" y="127" text-anchor="middle" font-size="10" fill="#1e293b">FROM</text>
+
+  <!-- q_tbl ACCEPT -->
+  <circle cx="356" cy="130" r="34" fill="none" stroke="#f59e0b" stroke-width="2"/>
+  <circle cx="356" cy="130" r="28" fill="#f59e0b" stroke="#d97706" stroke-width="2"/>
+  <text x="356" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_tbl</text>
+  <text x="356" y="139" text-anchor="middle" font-size="9" fill="#fef3c7">ACCEPT</text>
+
+  <!-- q_tbl self-loop: IDENT -->
+  <path d="M344,96 C336,58 376,58 368,96" fill="none" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="336" y="50" width="44" height="14" fill="white" rx="3"/>
+  <text x="358" y="60" text-anchor="middle" font-size="9" fill="#374151">IDENT</text>
+
+  <!-- q_tbl→q_where: WHERE -->
+  <line x1="390" y1="130" x2="468" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="393" y="117" width="72" height="14" fill="white" rx="3"/>
+  <text x="429" y="127" text-anchor="middle" font-size="10" fill="#1e293b">WHERE</text>
+
+  <!-- q_where -->
+  <circle cx="498" cy="130" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="498" y="126" text-anchor="middle" font-size="10" font-weight="700" fill="white">q_where</text>
+  <text x="498" y="139" text-anchor="middle" font-size="9" fill="#e5e7eb">condition</text>
+
+  <!-- q_where→q_col: IDENT -->
+  <line x1="526" y1="130" x2="614" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="531" y="117" width="78" height="14" fill="white" rx="3"/>
+  <text x="570" y="127" text-anchor="middle" font-size="10" fill="#1e293b">IDENT</text>
+
+  <!-- q_col -->
+  <circle cx="644" cy="130" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="644" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_col</text>
+  <text x="644" y="139" text-anchor="middle" font-size="9" fill="#e5e7eb">column</text>
+
+  <!-- q_col→q_eq: EQUALS -->
+  <line x1="672" y1="130" x2="750" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="675" y="117" width="72" height="14" fill="white" rx="3"/>
+  <text x="711" y="127" text-anchor="middle" font-size="10" fill="#1e293b">EQUALS</text>
+
+  <!-- q_eq -->
+  <circle cx="780" cy="130" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="780" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_eq</text>
+  <text x="780" y="139" text-anchor="middle" font-size="9" fill="#e5e7eb">after =</text>
+
+  <!-- q_eq→q_val: STRING/NUMBER -->
+  <line x1="808" y1="130" x2="896" y2="130" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="808" y="112" width="90" height="22" fill="white" rx="3"/>
+  <text x="853" y="122" text-anchor="middle" font-size="9" fill="#374151">STRING</text>
+  <text x="853" y="133" text-anchor="middle" font-size="9" fill="#374151">NUMBER</text>
+
+  <!-- q_val -->
+  <circle cx="926" cy="130" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="926" y="126" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_val</text>
+  <text x="926" y="139" text-anchor="middle" font-size="9" fill="#e5e7eb">value</text>
+
+  <!-- q_val→q_sqli: OR/UNION/TAUTO/SLEEP/SEMI/INFO -->
+  <path d="M950,118 C990,80 1080,80 1105,102" fill="none" stroke="#dc2626" stroke-width="2" marker-end="url(#r)"/>
+  <rect x="962" y="64" width="148" height="30" fill="white" rx="3"/>
+  <text x="1036" y="75" text-anchor="middle" font-size="9" fill="#dc2626">OR · UNION · UNION_ALL</text>
+  <text x="1036" y="87" text-anchor="middle" font-size="9" fill="#dc2626">TAUTOLOGY · SLEEP · SEMICOLON</text>
+
+  <!-- ══ q_sqli ACCEPT (right, y=155) ══ -->
+  <circle cx="1140" cy="155" r="34" fill="none" stroke="#dc2626" stroke-width="2.5"/>
+  <circle cx="1140" cy="155" r="28" fill="#dc2626" stroke="#b91c1c" stroke-width="2"/>
+  <text x="1140" y="151" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_sqli</text>
+  <text x="1140" y="164" text-anchor="middle" font-size="9" fill="#fecaca">ACCEPT</text>
+
+  <!-- q_sqli self-loop: SELECT/TAUTO/UNION/SLEEP -->
+  <path d="M1128,121 C1120,80 1160,80 1152,121" fill="none" stroke="#dc2626" stroke-width="1.5" marker-end="url(#r)"/>
+  <rect x="1096" y="64" width="128" height="26" fill="white" rx="3"/>
+  <text x="1160" y="74" text-anchor="middle" font-size="9" fill="#dc2626">SELECT · TAUTOLOGY</text>
+  <text x="1160" y="85" text-anchor="middle" font-size="9" fill="#dc2626">UNION · UNION_ALL · SLEEP</text>
+
+  <!-- ══ SHORTCUTS from q0 → q_sqli ══ -->
+  <!-- q0→q_sqli: TAUTOLOGY/SLEEP/INFO_SCHEMA (long arc above) -->
+  <path d="M88,102 C200,20 1000,20 1110,130" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6 3" marker-end="url(#r)"/>
+  <rect x="490" y="12" width="200" height="14" fill="white" rx="3"/>
+  <text x="590" y="22" text-anchor="middle" font-size="9" fill="#dc2626">TAUTOLOGY · SLEEP · INFORMATION_SCHEMA</text>
+
+  <!-- q0→q_or: OR (diagonal down) -->
+  <path d="M68,156 C68,230 148,260 166,260" fill="none" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="70" y="218" width="36" height="14" fill="white" rx="3"/>
+  <text x="88" y="228" text-anchor="middle" font-size="10" fill="#1e293b">OR</text>
+
+  <!-- q0→q_union: UNION/UNION_ALL (diagonal down further) -->
+  <path d="M78,158 C78,310 288,325 318,310" fill="none" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="66" y="300" width="100" height="22" fill="white" rx="3"/>
+  <text x="116" y="311" text-anchor="middle" font-size="9" fill="#374151">UNION</text>
+  <text x="116" y="322" text-anchor="middle" font-size="9" fill="#374151">UNION_ALL</text>
+
+  <!-- ══ BOTTOM ROW: q_or, q_union ══ -->
+
+  <!-- q_or (y=260) -->
+  <circle cx="214" cy="260" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="214" y="256" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_or</text>
+  <text x="214" y="269" text-anchor="middle" font-size="9" fill="#e5e7eb">after OR</text>
+
+  <!-- q_or→q_sqli: TAUTOLOGY/NUMBER/STRING -->
+  <path d="M234,244 C500,180 900,155 1106,158" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#r)"/>
+  <rect x="540" y="186" width="148" height="22" fill="white" rx="3"/>
+  <text x="614" y="196" text-anchor="middle" font-size="9" fill="#dc2626">TAUTOLOGY · NUMBER</text>
+  <text x="614" y="207" text-anchor="middle" font-size="9" fill="#dc2626">STRING</text>
+
+  <!-- q_union (y=310) -->
+  <circle cx="356" cy="310" r="28" fill="#6b7280" stroke="#4b5563" stroke-width="2"/>
+  <text x="356" y="306" text-anchor="middle" font-size="11" font-weight="700" fill="white">q_union</text>
+  <text x="356" y="319" text-anchor="middle" font-size="9" fill="#e5e7eb">after UNION</text>
+
+  <!-- q_union→q_sqli: SELECT/ALL -->
+  <path d="M376,296 C600,240 920,190 1106,162" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#r)"/>
+  <rect x="640" y="237" width="90" height="22" fill="white" rx="3"/>
+  <text x="685" y="247" text-anchor="middle" font-size="9" fill="#dc2626">SELECT</text>
+  <text x="685" y="258" text-anchor="middle" font-size="9" fill="#dc2626">ALL</text>
+
+  <!-- Shortcuts from mid-chain to q_sqli -->
+  <!-- q_prefix→q_sqli: SLEEP -->
+  <path d="M224,104 C400,40 1000,50 1106,138" fill="none" stroke="#dc2626" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#r)"/>
+
+  <!-- q_tbl→q_sqli: SEMICOLON/INFO_SCHEMA -->
+  <path d="M368,102 C600,50 1000,55 1108,138" fill="none" stroke="#dc2626" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#r)"/>
+
+  <!-- q_where→q_sqli: TAUTOLOGY/SEMICOLON -->
+  <path d="M510,102 C700,50 1000,60 1108,138" fill="none" stroke="#dc2626" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#r)"/>
+
+  <!-- Dashed shortcut label -->
+  <rect x="380" y="36" width="200" height="14" fill="#fef2f2" rx="3" stroke="#fca5a5" stroke-width="1"/>
+  <text x="480" y="46" text-anchor="middle" font-size="9" fill="#dc2626">─ ─ shortcut paths to q_sqli (SLEEP / SEMICOLON / INFO_SCHEMA)</text>
+
+  <!-- ══ LEGEND ══ -->
+  <rect x="60" y="358" width="1140" height="60" rx="7" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="90" y="374" font-size="10" font-weight="700" fill="#374151">7 attack sub-patterns:</text>
+  <text x="90" y="388" font-size="9" fill="#374151">① Direct tautology (q0→TAUTOLOGY→q_sqli)  ② SLEEP/pg_sleep (q0→SLEEP→q_sqli)  ③ INFORMATION_SCHEMA (q0→INFO→q_sqli)</text>
+  <text x="90" y="403" font-size="9" fill="#374151">④ OR bypass (q0→OR→q_or→TAUTO/NUM/STR→q_sqli)  ⑤ UNION injection (q0→UNION→q_union→SELECT→q_sqli)  ⑥ Post-value (q_val→OR/UNION/…→q_sqli)  ⑦ Early SEMICOLON</text>
+
+  <!-- q_tbl note -->
+  <rect x="316" y="170" width="80" height="22" rx="5" fill="#fef9c3" stroke="#fbbf24" stroke-width="1"/>
+  <text x="356" y="181" text-anchor="middle" font-size="9" fill="#78350f">q_tbl also</text>
+  <text x="356" y="191" text-anchor="middle" font-size="9" fill="#78350f">accepts (early)</text>
+</svg>

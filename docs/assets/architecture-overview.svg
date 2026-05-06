@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 820" font-family="system-ui,-apple-system,sans-serif">
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,10 3.5,0 7" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="700" height="820" fill="#f8fafc" rx="10" stroke="#e2e8f0" stroke-width="1.5"/>
+
+  <!-- Title -->
+  <text x="350" y="36" text-anchor="middle" font-size="17" font-weight="700" fill="#0f172a">LogGuard V2 — Architecture Overview</text>
+
+  <!-- ─── FILE SYSTEM LAYER ─── -->
+  <text x="14" y="98" font-size="9" fill="#94a3b8" font-weight="600" letter-spacing="1">FILE SYSTEM</text>
+  <rect x="215" y="58" width="270" height="52" rx="8" fill="#e0f2fe" stroke="#0ea5e9" stroke-width="1.5"/>
+  <text x="350" y="80" text-anchor="middle" font-size="13" font-weight="600" fill="#0c4a6e">PostgreSQL Log File</text>
+  <text x="350" y="97" text-anchor="middle" font-size="10" fill="#0369a1">postgresql-*.log</text>
+
+  <!-- Arrow 1 -->
+  <line x1="350" y1="110" x2="350" y2="143" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="263" y="115" width="174" height="15" fill="#f8fafc" rx="3"/>
+  <text x="350" y="126" text-anchor="middle" font-size="10" fill="#475569">500ms poll · persistent FileStream</text>
+
+  <!-- ─── FILE WATCHER ─── -->
+  <text x="14" y="166" font-size="9" fill="#94a3b8" font-weight="600" letter-spacing="1">I/O THREAD</text>
+  <rect x="190" y="148" width="320" height="52" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="350" y="170" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">FileWatcherLive</text>
+  <text x="350" y="187" text-anchor="middle" font-size="10" fill="#166534">Rotation detection · EOF seek · error resilience</text>
+
+  <!-- Arrow 2 -->
+  <line x1="350" y1="200" x2="350" y2="233" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="273" y="205" width="154" height="15" fill="#f8fafc" rx="3"/>
+  <text x="350" y="216" text-anchor="middle" font-size="10" fill="#475569">NewLines event · IReadOnlyList</text>
+
+  <!-- ─── CHANNEL ─── -->
+  <text x="14" y="256" font-size="9" fill="#94a3b8" font-weight="600" letter-spacing="1">BUFFER</text>
+  <rect x="195" y="238" width="310" height="52" rx="8" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+  <text x="350" y="260" text-anchor="middle" font-size="13" font-weight="600" fill="#7c2d12">Channel&lt;string&gt;</text>
+  <text x="350" y="277" text-anchor="middle" font-size="10" fill="#9a3412">Unbounded MPSC · SingleReader=true · AllowSync=false</text>
+
+  <!-- Arrow 3 -->
+  <line x1="350" y1="290" x2="350" y2="318" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="284" y="295" width="132" height="15" fill="#f8fafc" rx="3"/>
+  <text x="350" y="306" text-anchor="middle" font-size="10" fill="#475569">async ReadAllAsync</text>
+
+  <!-- ─── CONSUMER TASK BOX ─── -->
+  <text x="14" y="340" font-size="9" fill="#94a3b8" font-weight="600" letter-spacing="1">CONSUMER TASK</text>
+  <rect x="72" y="323" width="556" height="290" rx="10" fill="#fafafa" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <text x="350" y="343" text-anchor="middle" font-size="11" font-weight="600" fill="#4338ca">LogLiveWatcher — Consumer Task (background Task.Run)</text>
+
+  <!-- PostgreSqlLogParser -->
+  <rect x="120" y="356" width="460" height="50" rx="7" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="350" y="377" text-anchor="middle" font-size="12" font-weight="600" fill="#4c1d95">PostgreSqlLogParser</text>
+  <text x="350" y="394" text-anchor="middle" font-size="10" fill="#5b21b6">7 line types · PID context · timezone resolution</text>
+
+  <!-- Arrow inside 1 -->
+  <line x1="350" y1="406" x2="350" y2="428" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="296" y="410" width="108" height="13" fill="#fafafa" rx="3"/>
+  <text x="350" y="421" text-anchor="middle" font-size="10" fill="#475569">PgLogEntry</text>
+
+  <!-- SqlTokenizer -->
+  <rect x="120" y="432" width="460" height="50" rx="7" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
+  <text x="350" y="453" text-anchor="middle" font-size="12" font-weight="600" fill="#713f12">SqlTokenizer</text>
+  <text x="350" y="470" text-anchor="middle" font-size="10" fill="#854d0e">4-phase pipeline · ReDoS-immune state machine</text>
+
+  <!-- Arrow inside 2 -->
+  <line x1="350" y1="482" x2="350" y2="504" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="278" y="486" width="144" height="13" fill="#fafafa" rx="3"/>
+  <text x="350" y="497" text-anchor="middle" font-size="10" fill="#475569">List&lt;string&gt; tokens</text>
+
+  <!-- NfaEngine[] -->
+  <rect x="120" y="508" width="460" height="50" rx="7" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="350" y="529" text-anchor="middle" font-size="12" font-weight="600" fill="#14532d">NfaEngine[]</text>
+  <text x="350" y="546" text-anchor="middle" font-size="10" fill="#166534">Sequential ≤4 engines · Parallel.ForEach >4 · RequireAbsentTokens</text>
+
+  <!-- BF check note -->
+  <rect x="120" y="568" width="460" height="32" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="350" y="584" text-anchor="middle" font-size="10" fill="#991b1b">BRUTEFORCE: IsBruteForce(user@host) — 5+ matches / 60s sliding window</text>
+  <text x="350" y="596" text-anchor="middle" font-size="10" fill="#991b1b">EXFIL: RequireAbsentTokens check (WHERE, LIMIT)</text>
+
+  <!-- Arrow 4 (out of consumer task) -->
+  <line x1="350" y1="613" x2="350" y2="643" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="224" y="617" width="252" height="13" fill="#f8fafc" rx="3"/>
+  <text x="350" y="628" text-anchor="middle" font-size="10" fill="#475569">EntryDetected → Dispatcher.InvokeAsync</text>
+
+  <!-- ─── UI LAYER ─── -->
+  <text x="14" y="666" font-size="9" fill="#94a3b8" font-weight="600" letter-spacing="1">UI THREAD</text>
+  <rect x="82" y="648" width="536" height="78" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="350" y="670" text-anchor="middle" font-size="13" font-weight="600" fill="#1e3a8a">WPF UI — MainWindow</text>
+  <text x="350" y="688" text-anchor="middle" font-size="10" fill="#1d4ed8">DataGrid (5 000 cap) · KPI Bar (1s refresh) · Sparkline Charts</text>
+  <text x="350" y="704" text-anchor="middle" font-size="10" fill="#1d4ed8">Module Manager · Settings · Custom Chrome</text>
+  <text x="350" y="718" text-anchor="middle" font-size="10" fill="#1d4ed8">Interlocked counters · _fatalMinWindow (lock) · ICollectionView filter</text>
+
+  <!-- Thread annotations (right side) -->
+  <rect x="613" y="58" width="76" height="142" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="651" y="75" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">System.Threading</text>
+  <text x="651" y="87" text-anchor="middle" font-size="9" fill="#64748b">.Timer</text>
+  <text x="651" y="105" text-anchor="middle" font-size="9" fill="#64748b">pool thread</text>
+  <line x1="613" y1="130" x2="613" y2="130" stroke="none"/>
+  <text x="651" y="125" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">Writes to</text>
+  <text x="651" y="138" text-anchor="middle" font-size="9" fill="#64748b">Channel</text>
+  <text x="651" y="151" text-anchor="middle" font-size="9" fill="#64748b">Writer</text>
+  <text x="651" y="166" text-anchor="middle" font-size="9" fill="#64748b">TryWrite</text>
+  <text x="651" y="183" text-anchor="middle" font-size="9" fill="#64748b">+ FlushStale</text>
+
+  <!-- FlushStale annotation -->
+  <rect x="613" y="638" width="76" height="50" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="651" y="655" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">KPI Timer</text>
+  <text x="651" y="668" text-anchor="middle" font-size="9" fill="#64748b">calls</text>
+  <text x="651" y="681" text-anchor="middle" font-size="9" fill="#64748b">FlushStale(2000)</text>
+
+  <!-- Legend -->
+  <rect x="72" y="745" width="556" height="62" rx="6" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="106" y="762" font-size="10" font-weight="600" fill="#374151">Legend</text>
+  <rect x="106" y="768" width="14" height="10" rx="2" fill="#e0f2fe" stroke="#0ea5e9" stroke-width="1"/>
+  <text x="124" y="777" font-size="9" fill="#374151">File system</text>
+  <rect x="196" y="768" width="14" height="10" rx="2" fill="#f0fdf4" stroke="#22c55e" stroke-width="1"/>
+  <text x="214" y="777" font-size="9" fill="#374151">I/O thread</text>
+  <rect x="283" y="768" width="14" height="10" rx="2" fill="#fff7ed" stroke="#f97316" stroke-width="1"/>
+  <text x="301" y="777" font-size="9" fill="#374151">Channel buffer</text>
+  <rect x="388" y="768" width="14" height="10" rx="2" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+  <text x="406" y="777" font-size="9" fill="#374151">Consumer task</text>
+  <rect x="490" y="768" width="14" height="10" rx="2" fill="#dbeafe" stroke="#3b82f6" stroke-width="1"/>
+  <text x="508" y="777" font-size="9" fill="#374151">UI thread</text>
+  <text x="350" y="799" text-anchor="middle" font-size="9" fill="#94a3b8">File I/O and NFA analysis are fully decoupled via Channel — UI thread never blocks on I/O</text>
+</svg>
