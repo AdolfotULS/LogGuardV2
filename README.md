@@ -106,6 +106,8 @@ LogGuard V2 is a Windows WPF desktop application that monitors PostgreSQL databa
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+![Architecture Overview](docs/assets/architecture-overview.svg)
+
 **Design Principles:**
 - File I/O decoupled from analysis via `Channel<string>` (producer/consumer)
 - All NFA state is read-only after construction — zero locking during matching
@@ -578,6 +580,8 @@ Detects 7 SQLi sub-patterns in a single automaton:
                                 └── SEMICOLON/INFO_SCHEMA ──────────────────────────────────────────────────────►┘
 ```
 
+![NFA: SQL Injection](docs/assets/nfa-sqli.svg)
+
 ---
 
 #### Brute_Force.json — `pgsql-bruteforce-v1`
@@ -592,6 +596,8 @@ q0 ─SELECT─► q_sel ─FROM─► q_from ─IDENT─► q_tbl ─WHERE─�
                   ↑
             IDENT/STAR self-loop
 ```
+
+![NFA: Brute Force](docs/assets/nfa-bruteforce.svg)
 
 ---
 
@@ -610,6 +616,8 @@ q0 ─SELECT─► q_sel ─STAR─► q_kw_from ─FROM─► q_from ─IDENT�
              IDENT self-loop
 ```
 
+![NFA: Data Exfiltration](docs/assets/nfa-exfiltration.svg)
+
 ---
 
 #### Privilege Escalation.json — `pgsql-privesc-v1`
@@ -625,6 +633,8 @@ q0 ─ALTER─► q_alter ─USER/ROLE─► q_target ─IDENT─► q_name ─S
                                                             WITH ─► q_with ─SUPERUSER─► q_super
 ```
 
+![NFA: Privilege Escalation](docs/assets/nfa-privesc.svg)
+
 ---
 
 #### Enumeration.json — `pgsql-discovery-v2`
@@ -633,6 +643,8 @@ q0 ─ALTER─► q_alter ─USER/ROLE─► q_target ─IDENT─► q_name ─S
 
 Detects direct access to `information_schema`, `pg_shadow`, `pg_user`, `pg_roles`, `pg_authid`, `sysobjects`, and other system catalog tables. Both direct reference (`q0 → INFORMATION_SCHEMA → q_disc`) and post-FROM reference are caught.
 
+![NFA: Schema Enumeration](docs/assets/nfa-enumeration.svg)
+
 ---
 
 #### Time SQI.json — `pgsql-time-sqli-v2`
@@ -640,6 +652,8 @@ Detects direct access to `information_schema`, `pg_shadow`, `pg_user`, `pg_roles
 **Severity:** High | **ThreatType:** SQLI
 
 Detects time-based blind SQLi via `SLEEP(N)`, `pg_sleep(N)`, or `BENCHMARK(N, ...)`. The `SLEEP` token is canonical for `SLEEP`, `PG_SLEEP`, and `DBMS_PIPE`. Matches `SELECT [ident] SLEEP(...)` and bare `SLEEP(...)` / `BENCHMARK(...)`.
+
+![NFA: Time-based SQL Injection](docs/assets/nfa-time-sqli.svg)
 
 ---
 
@@ -706,6 +720,8 @@ MainWindow.OnLiveEntry()
   - _entries.Insert(0, entry)   [newest first]
   - Cap at 5,000 entries
 ```
+
+![Full Processing Pipeline](docs/assets/pipeline.svg)
 
 ---
 
@@ -804,6 +820,8 @@ If `IsBruteForce` returns false, `matchedEngine` is set to null and the entry is
 ---
 
 ## SQL Tokenizer Deep Dive
+
+![SQL Tokenizer — 4-Phase Pipeline](docs/assets/tokenizer-pipeline.svg)
 
 ### Phase 1 — Normalization
 
