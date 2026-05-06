@@ -46,14 +46,18 @@ namespace LogGuardV2.src.Engine
             Severity            = profile.Metadata.Severity;
         }
 
-        /// <summary>Returns true if the token stream contains a substring accepted by this NFA.</summary>
-        public bool Run(IEnumerable<string> tokens)
+        /// <summary>
+        /// Returns true if the token stream contains a substring accepted by this NFA.
+        /// Accepts IReadOnlyList so callers can pass a materialized list without boxing.
+        /// </summary>
+        public bool Run(IReadOnlyList<string> tokens)
         {
             var active = new HashSet<string>(_startStates);
-            var next   = new HashSet<string>();
+            var next   = new HashSet<string>(_startStates.Count + 4);
 
-            foreach (var token in tokens)
+            for (int i = 0; i < tokens.Count; i++)
             {
+                var token = tokens[i];
                 next.Clear();
                 next.UnionWith(_startStates);
 
