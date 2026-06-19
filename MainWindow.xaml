@@ -818,6 +818,11 @@
                                                              FontFamily="Consolas" FontSize="12" VerticalAlignment="Center"
                                                              CaretBrush="{StaticResource AccentBrush}"/>
                                                 </Border>
+                                                <Button x:Name="BtnTestWebhook" Content="TEST DISCORD WEBHOOK"
+                                                        Click="BtnTestWebhook_Click"
+                                                        Style="{StaticResource SecondaryBtn}"
+                                                        Height="28" Margin="0,6,0,0" HorizontalAlignment="Left"
+                                                        Padding="12,0" FontFamily="Segoe UI" FontSize="11"/>
                                             </StackPanel>
                                             <StackPanel Grid.Column="2">
                                                 <TextBlock Text="MINIMUM LEVEL" FontFamily="Segoe UI" FontSize="10"

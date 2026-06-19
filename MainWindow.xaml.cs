@@ -508,6 +508,67 @@ namespace LogGuardV2
                 "Pattern Test", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
+        // ─── Discord webhook test ─────────────────────────────────────────────────
+
+        private static readonly System.Net.Http.HttpClient _http = new();
+
+        private async void BtnTestWebhook_Click(object s, RoutedEventArgs e)
+        {
+            var url = TxtWebhookUrl.Text.Trim();
+            if (string.IsNullOrEmpty(url))
+            {
+                MessageBox.Show("Ingresa una URL de webhook antes de probar.", "Test Webhook",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            BtnTestWebhook.IsEnabled = false;
+            BtnTestWebhook.Content   = "ENVIANDO…";
+
+            var payload = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                username = "LogGuardV2",
+                embeds   = new[]
+                {
+                    new
+                    {
+                        title       = "Test de webhook — LogGuardV2",
+                        description = "Webhook configurado correctamente. Las alertas de amenazas se enviarán aquí.",
+                        color       = 3066993,   // verde Discord
+                        footer      = new { text = $"Enviado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}" }
+                    }
+                }
+            });
+
+            try
+            {
+                var content  = new System.Net.Http.StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+                var response = await _http.PostAsync(url, content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    BtnTestWebhook.Content = "OK — MENSAJE ENVIADO";
+                    await System.Threading.Tasks.Task.Delay(3000);
+                }
+                else
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    MessageBox.Show($"Discord rechazó la solicitud.\nHTTP {(int)response.StatusCode}: {body}",
+                        "Test Webhook", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al conectar con el webhook:\n{ex.Message}",
+                    "Test Webhook", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                BtnTestWebhook.IsEnabled = true;
+                BtnTestWebhook.Content   = "TEST DISCORD WEBHOOK";
+            }
+        }
+
         // ─── Clock ────────────────────────────────────────────────────────────────
 
         private void SetupClock()
