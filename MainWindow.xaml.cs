@@ -49,12 +49,16 @@ namespace LogGuardV2
 
     public class LevelToBadgeBgConverter : IValueConverter
     {
+        private static readonly SolidColorBrush _highBg   = FB(new SolidColorBrush(Color.FromArgb(20,  229, 72,  77)));
+        private static readonly SolidColorBrush _warnBg   = FB(new SolidColorBrush(Color.FromArgb(20,  245, 158, 11)));
+        private static readonly SolidColorBrush _noticeBg = FB(new SolidColorBrush(Color.FromArgb(20,  139, 92,  246)));
+        private static SolidColorBrush FB(SolidColorBrush b) { b.Freeze(); return b; }
         public object Convert(object v, Type t, object p, CultureInfo c) => (string)v switch
         {
             "CRITICAL" or "FATAL"   => Application.Current.Resources["DangerBrush"],
-            "HIGH"     or "ERROR"   => new SolidColorBrush(Color.FromArgb(20,  229, 72,  77)),
-            "MEDIUM"   or "WARNING" => new SolidColorBrush(Color.FromArgb(20,  245, 158, 11)),
-            "LOW"      or "NOTICE"  => new SolidColorBrush(Color.FromArgb(20,  139, 92,  246)),
+            "HIGH"     or "ERROR"   => _highBg,
+            "MEDIUM"   or "WARNING" => _warnBg,
+            "LOW"      or "NOTICE"  => _noticeBg,
             _                       => Application.Current.Resources["Bg2"]
         };
         public object ConvertBack(object v, Type t, object p, CultureInfo c) => throw new NotImplementedException();
@@ -62,12 +66,16 @@ namespace LogGuardV2
 
     public class LevelToBadgeBorderConverter : IValueConverter
     {
+        private static readonly SolidColorBrush _highBrd   = FB(new SolidColorBrush(Color.FromArgb(100, 229, 72,  77)));
+        private static readonly SolidColorBrush _warnBrd   = FB(new SolidColorBrush(Color.FromArgb(100, 245, 158, 11)));
+        private static readonly SolidColorBrush _noticeBrd = FB(new SolidColorBrush(Color.FromArgb(100, 139, 92,  246)));
+        private static SolidColorBrush FB(SolidColorBrush b) { b.Freeze(); return b; }
         public object Convert(object v, Type t, object p, CultureInfo c) => (string)v switch
         {
             "CRITICAL" or "FATAL"   => Application.Current.Resources["DangerBrush"],
-            "HIGH"     or "ERROR"   => new SolidColorBrush(Color.FromArgb(100, 229, 72,  77)),
-            "MEDIUM"   or "WARNING" => new SolidColorBrush(Color.FromArgb(100, 245, 158, 11)),
-            "LOW"      or "NOTICE"  => new SolidColorBrush(Color.FromArgb(100, 139, 92,  246)),
+            "HIGH"     or "ERROR"   => _highBrd,
+            "MEDIUM"   or "WARNING" => _warnBrd,
+            "LOW"      or "NOTICE"  => _noticeBrd,
             _                       => Application.Current.Resources["Line2Brush"]
         };
         public object ConvertBack(object v, Type t, object p, CultureInfo c) => throw new NotImplementedException();
@@ -89,17 +97,19 @@ namespace LogGuardV2
 
     public class BoolToInjBgConverter : IValueConverter
     {
+        private static readonly SolidColorBrush _injBg = FB(new SolidColorBrush(Color.FromArgb(20, 229, 72, 77)));
+        private static SolidColorBrush FB(SolidColorBrush b) { b.Freeze(); return b; }
         public object Convert(object v, Type t, object p, CultureInfo c) =>
-            (bool)v ? (object)new SolidColorBrush(Color.FromArgb(20,  229, 72, 77))
-                    : Application.Current.Resources["Bg2"];
+            (bool)v ? (object)_injBg : Application.Current.Resources["Bg2"];
         public object ConvertBack(object v, Type t, object p, CultureInfo c) => throw new NotImplementedException();
     }
 
     public class BoolToInjBorderConverter : IValueConverter
     {
+        private static readonly SolidColorBrush _injBrd = FB(new SolidColorBrush(Color.FromArgb(100, 229, 72, 77)));
+        private static SolidColorBrush FB(SolidColorBrush b) { b.Freeze(); return b; }
         public object Convert(object v, Type t, object p, CultureInfo c) =>
-            (bool)v ? (object)new SolidColorBrush(Color.FromArgb(100, 229, 72, 77))
-                    : Application.Current.Resources["Line2Brush"];
+            (bool)v ? (object)_injBrd : Application.Current.Resources["Line2Brush"];
         public object ConvertBack(object v, Type t, object p, CultureInfo c) => throw new NotImplementedException();
     }
 
@@ -147,6 +157,23 @@ namespace LogGuardV2
         private readonly System.Collections.Generic.Queue<double> _fatHistory  = new();
         private readonly System.Collections.Generic.Queue<double> _durHistory  = new();
         private const int SparkPoints = 48;
+
+        // Static frozen-brush cache — keyed by hex string, eliminates per-tick allocations
+        private static readonly Dictionary<string, (Color C, SolidColorBrush Solid, SolidColorBrush Fill36, SolidColorBrush Fill89, SolidColorBrush Fill178)> _brushCache = new();
+        private static (Color C, SolidColorBrush Solid, SolidColorBrush Fill36, SolidColorBrush Fill89, SolidColorBrush Fill178) GetBrush(string hex)
+        {
+            if (!_brushCache.TryGetValue(hex, out var e))
+            {
+                var c   = (Color)ColorConverter.ConvertFromString(hex);
+                var s   = Frz(new SolidColorBrush(c));
+                var f36 = Frz(new SolidColorBrush(Color.FromArgb( 36, c.R, c.G, c.B)));
+                var f89 = Frz(new SolidColorBrush(Color.FromArgb( 89, c.R, c.G, c.B)));
+                var f178= Frz(new SolidColorBrush(Color.FromArgb(178, c.R, c.G, c.B)));
+                _brushCache[hex] = e = (c, s, f36, f89, f178);
+            }
+            return e;
+        }
+        private static SolidColorBrush Frz(SolidColorBrush b) { b.Freeze(); return b; }
 
         public MainWindow()
         {
@@ -413,14 +440,17 @@ namespace LogGuardV2
                 LatencyStatsText.Text = "p50 —ms · p95 —ms · p99 —ms";
             }
 
-            DrawSparkline(SparkQps,      "#4F8CFF", _epsHistory);
-            DrawSparkline(SparkInjected, "#F59E0B", _injHistory);
-            DrawSparkline(SparkFatal,    "#E5484D", _fatHistory);
-            DrawSparkline(SparkAvgDur,   "#8B5CF6", _durHistory);
+            if (TabDashboard.Visibility == Visibility.Visible)
+            {
+                DrawSparkline(SparkQps,      "#4F8CFF", _epsHistory);
+                DrawSparkline(SparkInjected, "#F59E0B", _injHistory);
+                DrawSparkline(SparkFatal,    "#E5484D", _fatHistory);
+                DrawSparkline(SparkAvgDur,   "#8B5CF6", _durHistory);
 
-            DrawLevelDistribution();
-            DrawTopDatabases();
-            DrawLatencyHistogram(sortedDurations);
+                DrawLevelDistribution();
+                DrawTopDatabases();
+                DrawLatencyHistogram(sortedDurations);
+            }
         }
 
         // ─── Settings ─────────────────────────────────────────────────────────────
@@ -606,24 +636,27 @@ namespace LogGuardV2
 
             double min = pts.Min(), max = pts.Max();
             double range = max > min ? max - min : 1;
-            var color  = (Color)ColorConverter.ConvertFromString(hex);
-            var points = new PointCollection();
+            var (_, lineBrush, fillBrush, _, _) = GetBrush(hex);
+            var points = new PointCollection(pts.Length);
             for (int i = 0; i < pts.Length; i++)
             {
                 double x = i * w / (pts.Length - 1);
                 double y = h - 4 - (pts[i] - min) / range * (h - 8);
                 points.Add(new Point(x, Math.Max(2, Math.Min(h - 2, y))));
             }
-            var areaPts = new PointCollection(points) { new(w, h), new(0, h) };
+            var areaPts = new PointCollection(pts.Length + 2);
+            foreach (var pt in points) areaPts.Add(pt);
+            areaPts.Add(new Point(w, h));
+            areaPts.Add(new Point(0, h));
             canvas.Children.Add(new Polygon
             {
                 Points = areaPts,
-                Fill   = new SolidColorBrush(Color.FromArgb(36, color.R, color.G, color.B))
+                Fill   = fillBrush
             });
             canvas.Children.Add(new Polyline
             {
                 Points          = points,
-                Stroke          = new SolidColorBrush(color),
+                Stroke          = lineBrush,
                 StrokeThickness = 1.4
             });
         }
@@ -673,17 +706,21 @@ namespace LogGuardV2
             double bw       = w / bins;
             double maxCount = binValues.Max() > 0 ? binValues.Max() : 1;
 
+            var histRed  = GetBrush("#E5484D").Fill178;
+            var histAmb  = GetBrush("#F59E0B").Fill178;
+            var histBlue = GetBrush("#4F8CFF").Fill178;
+            var p95Brush = GetBrush("#F59E0B").Solid;
+
             for (int i = 0; i < bins; i++)
             {
                 double bh = binValues[i] / maxCount * (h - 20);
                 if (bh < 1) continue;
-                string hx = i > 20 ? "#E5484D" : i > 14 ? "#F59E0B" : "#4F8CFF";
-                var    c  = (Color)ColorConverter.ConvertFromString(hx);
-                var rect  = new Rectangle
+                var fill = i > 20 ? histRed : i > 14 ? histAmb : histBlue;
+                var rect = new Rectangle
                 {
                     Width  = Math.Max(1, bw - 2),
                     Height = bh,
-                    Fill   = new SolidColorBrush(Color.FromArgb(178, c.R, c.G, c.B))
+                    Fill   = fill
                 };
                 Canvas.SetLeft(rect, i * bw + 1);
                 Canvas.SetTop(rect, h - bh);
@@ -693,7 +730,7 @@ namespace LogGuardV2
             var marker = new Line
             {
                 X1 = p95x, Y1 = 0, X2 = p95x, Y2 = h,
-                Stroke          = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B")),
+                Stroke          = p95Brush,
                 StrokeDashArray = new DoubleCollection { 3, 3 },
                 StrokeThickness = 1
             };
@@ -701,7 +738,7 @@ namespace LogGuardV2
             var lbl = new TextBlock
             {
                 Text       = "p95",
-                Foreground  = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B")),
+                Foreground  = p95Brush,
                 FontFamily  = new FontFamily("Consolas"),
                 FontSize    = 10
             };
@@ -743,8 +780,8 @@ namespace LogGuardV2
                 string hex   = hexes[i];
                 int    count = counts[label];
                 double bh    = count > 0 ? Math.Max(3, (double)count / maxCount * barMaxH) : 0;
-                var    c     = (Color)ColorConverter.ConvertFromString(hex);
-                double x     = gap + i * (barW + gap);
+                var (_, strokeBrush, _, fillBrush, _) = GetBrush(hex);
+                double x = gap + i * (barW + gap);
 
                 if (bh > 0)
                 {
@@ -752,8 +789,8 @@ namespace LogGuardV2
                     {
                         Width           = barW,
                         Height          = bh,
-                        Fill            = new SolidColorBrush(Color.FromArgb(89, c.R, c.G, c.B)),
-                        Stroke          = new SolidColorBrush(c),
+                        Fill            = fillBrush,
+                        Stroke          = strokeBrush,
                         StrokeThickness = 1
                     };
                     Canvas.SetLeft(rect, x);
@@ -805,8 +842,8 @@ namespace LogGuardV2
             double canvasW  = TopDbCanvas.ActualWidth > 10 ? TopDbCanvas.ActualWidth : 360;
             const double nameW = 130, countW = 50, rowH = 28;
             double barAreaW = Math.Max(20, canvasW - nameW - countW - 8);
-            int    maxCount = top5[0].Count;
-            var    accent   = (Color)ColorConverter.ConvertFromString("#4F8CFF");
+            int    maxCount   = top5[0].Count;
+            var    accentBrush = GetBrush("#4F8CFF").Solid;
 
             for (int i = 0; i < top5.Length; i++)
             {
@@ -840,7 +877,7 @@ namespace LogGuardV2
                 {
                     Width  = Math.Max(2, barW),
                     Height = 6,
-                    Fill   = new SolidColorBrush(accent)
+                    Fill   = accentBrush
                 };
                 Canvas.SetLeft(bar, nameW);
                 Canvas.SetTop(bar, y + 10);

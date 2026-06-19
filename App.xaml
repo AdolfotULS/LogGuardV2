@@ -254,6 +254,12 @@
             <Setter Property="CanUserResizeRows" Value="False"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
             <Setter Property="SelectionUnit" Value="FullRow"/>
+            <!-- Recycling reuses row containers instead of create/destroy per scroll -->
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="VirtualizingPanel.IsContainerVirtualizable" Value="True"/>
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+            <Setter Property="EnableRowVirtualization" Value="True"/>
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
