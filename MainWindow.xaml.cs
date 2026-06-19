@@ -123,6 +123,8 @@ namespace LogGuardV2
         private LogLiveWatcher? _liveWatcher;
         private bool _isWatching;
         private readonly DateTime _appStart = DateTime.UtcNow;
+        private AppSettings _currentSettings = new();
+        private System.Windows.Forms.NotifyIcon? _trayIcon;
 
         // Counters — written on thread-pool, read on UI thread via Interlocked
         private long _totalEvents;
@@ -157,7 +159,14 @@ namespace LogGuardV2
             SetupClock();
             SetupKpiTimer();
             Loaded += (_, _) => DrawCharts();
-            Closed += (_, _) => StopWatcher();
+            Closed += (_, _) => { StopWatcher(); _trayIcon?.Dispose(); };
+
+            _trayIcon = new System.Windows.Forms.NotifyIcon
+            {
+                Icon    = System.Drawing.SystemIcons.Shield,
+                Text    = "LogGuardV2",
+                Visible = false
+            };
         }
 
         // ─── Watcher lifecycle ────────────────────────────────────────────────────
@@ -181,6 +190,9 @@ namespace LogGuardV2
 
             var settings  = ReadSettingsFromForm();
             var nfaFolder = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NFA");
+
+            _currentSettings = settings;
+            if (_trayIcon != null) _trayIcon.Visible = settings.DesktopNotifications;
 
             _liveWatcher?.Dispose();
             _liveWatcher = new LogLiveWatcher(settings, nfaFolder);
@@ -237,6 +249,18 @@ namespace LogGuardV2
                 Interlocked.Increment(ref _injectedCount);
                 Interlocked.Increment(ref _injectedThisSecond);
             }
+
+            // Desktop notifications — safe to call from thread-pool via Dispatcher
+            if (_currentSettings.AudioBeepOnFatal && entry.Level is "CRITICAL" or "FATAL")
+                System.Threading.Tasks.Task.Run(() => Console.Beep(880, 300));
+
+            if (_currentSettings.DesktopNotifications && entry.IsInjected && _trayIcon is not null)
+                Dispatcher.InvokeAsync(() =>
+                    _trayIcon.ShowBalloonTip(4000,
+                        "LogGuard — Amenaza detectada",
+                        $"{entry.ThreatType} · {entry.UserHost} · {entry.Database}",
+                        System.Windows.Forms.ToolTipIcon.Warning));
+
             if (entry.Duration > 0)
             {
                 Interlocked.Add(ref _durationSumUs, (long)(entry.Duration * 1000));
