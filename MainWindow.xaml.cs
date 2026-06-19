@@ -117,6 +117,7 @@ namespace LogGuardV2
         private System.ComponentModel.ICollectionView? _view;
         private string _searchText = "";
         private readonly HashSet<string> _activeFilters = new() { "CRITICAL","HIGH","MEDIUM","LOW","WARNING","LOG" };
+        private readonly Dictionary<string, int> _levelCounts = new(5) { ["LOG"]=0, ["NOTICE"]=0, ["WARNING"]=0, ["ERROR"]=0, ["CRITICAL"]=0 };
 
         private readonly DispatcherTimer _clock   = new();
         private readonly DispatcherTimer _kpiTimer = new();
@@ -185,7 +186,9 @@ namespace LogGuardV2
             Interlocked.Exchange(ref _injectedCount,    0);
             Interlocked.Exchange(ref _durationSumUs,    0);
             Interlocked.Exchange(ref _durationCount,    0);
-            Interlocked.Exchange(ref _eventsThisSecond, 0);
+            Interlocked.Exchange(ref _eventsThisSecond,   0);
+            Interlocked.Exchange(ref _injectedThisSecond, 0);
+            Interlocked.Exchange(ref _fatalThisSecond,    0);
             lock (_fatalWindowLock) _fatalMinWindow.Clear();
 
             var settings  = ReadSettingsFromForm();
@@ -252,7 +255,7 @@ namespace LogGuardV2
 
             // Desktop notifications — safe to call from thread-pool via Dispatcher
             if (_currentSettings.AudioBeepOnFatal && entry.Level is "CRITICAL" or "FATAL")
-                System.Threading.Tasks.Task.Run(() => Console.Beep(880, 300));
+                ThreadPool.UnsafeQueueUserWorkItem(_ => Console.Beep(880, 300), null);
 
             if (_currentSettings.DesktopNotifications && entry.IsInjected && _trayIcon is not null)
                 Dispatcher.InvokeAsync(() =>
@@ -344,11 +347,14 @@ namespace LogGuardV2
             KpiInjSubtext.Foreground = (Brush)FindResource(injected >= 10 ? "DangerBrush"
                 : injected >= 1 ? "WarnBrush" : "TextMuteBrush");
 
-            // Duration: p95 from collected entries
-            double[] durations = _entries.Select(e => e.Duration).Where(d => d > 0).ToArray();
-            if (durations.Length >= 5)
+            // Duration: sort once; pass snapshot to RefreshDashboardCharts and DrawLatencyHistogram
+            double[] durSnapshot = _entries.Select(e => e.Duration).Where(d => d > 0).ToArray();
+            if (durSnapshot.Length >= 5) Array.Sort(durSnapshot);
+            double[]? sortedDurations = durSnapshot.Length >= 5 ? durSnapshot : null;
+
+            if (sortedDurations != null)
             {
-                double p95 = durations.OrderBy(d => d).ToArray()[(int)(durations.Length * 0.95)];
+                double p95 = sortedDurations[(int)(sortedDurations.Length * 0.95)];
                 KpiDurSubtext.Text = $"p95 {p95:F0}ms";
                 KpiDurSubtext.Foreground = (Brush)FindResource(p95 >= 1000 ? "DangerBrush"
                     : p95 >= 200 ? "WarnBrush" : "TextMuteBrush");
@@ -371,7 +377,7 @@ namespace LogGuardV2
                 StatusText.Text =
                     $"LIVE · events: {total:N0} │ injected: {injected:N0} │ modules: {_liveWatcher.EngineCount}";
 
-            RefreshDashboardCharts(eps, epsInj, epsFat, avg, total, errors, injected);
+            RefreshDashboardCharts(eps, epsInj, epsFat, avg, total, errors, injected, sortedDurations);
         }
 
         private static void PushHistory(System.Collections.Generic.Queue<double> q, double v)
@@ -381,7 +387,7 @@ namespace LogGuardV2
         }
 
         private void RefreshDashboardCharts(double eps, double epsInj, double epsFat, double avg,
-                                            long total, long errors, long injected)
+                                            long total, long errors, long injected, double[]? sortedDurations = null)
         {
             DashQpsValue.Text    = eps.ToString("N0");
             DashInjValue.Text    = epsInj.ToString("N0");
@@ -394,14 +400,12 @@ namespace LogGuardV2
             DashInjDetail.Text   = $"total: {injected:N0} · session";
             DashFatalDetail.Text = $"total: {errors:N0} · session";
 
-            double[] durations = _entries.Select(e => e.Duration).Where(d => d > 0).ToArray();
-            if (durations.Length >= 10)
+            if (sortedDurations != null && sortedDurations.Length >= 10)
             {
-                double[] sorted = durations.OrderBy(d => d).ToArray();
-                double   p95    = sorted[(int)(sorted.Length * 0.95)];
-                double   p99    = sorted[(int)(sorted.Length * 0.99)];
-                DashAvgDurDetail.Text  = $"p95 {p95:F0}ms · p99 {p99:F0}ms";
-                LatencyStatsText.Text  = $"p50 {sorted[sorted.Length / 2]:F0}ms · p95 {p95:F0}ms · p99 {p99:F0}ms";
+                double p95 = sortedDurations[(int)(sortedDurations.Length * 0.95)];
+                double p99 = sortedDurations[(int)(sortedDurations.Length * 0.99)];
+                DashAvgDurDetail.Text = $"p95 {p95:F0}ms · p99 {p99:F0}ms";
+                LatencyStatsText.Text = $"p50 {sortedDurations[sortedDurations.Length / 2]:F0}ms · p95 {p95:F0}ms · p99 {p99:F0}ms";
             }
             else
             {
@@ -416,7 +420,7 @@ namespace LogGuardV2
 
             DrawLevelDistribution();
             DrawTopDatabases();
-            DrawLatencyHistogram();
+            DrawLatencyHistogram(sortedDurations);
         }
 
         // ─── Settings ─────────────────────────────────────────────────────────────
@@ -624,13 +628,17 @@ namespace LogGuardV2
             });
         }
 
-        private void DrawLatencyHistogram()
+        private void DrawLatencyHistogram(double[]? sortedDurations = null)
         {
             const double w = 600, h = 120;
             const int    bins = 28;
             LatencyCanvas.Children.Clear();
 
-            double[] durations = _entries.Select(e => e.Duration).Where(d => d > 0).ToArray();
+            // Reuse pre-sorted snapshot from RefreshKpis when available
+            double[] durations = sortedDurations
+                ?? _entries.Select(e => e.Duration).Where(d => d > 0).ToArray();
+            if (sortedDurations == null && durations.Length >= 5)
+                Array.Sort(durations);
             double[] binValues;
             double   p95x;
 
@@ -646,9 +654,8 @@ namespace LogGuardV2
                 }
                 binValues = counts;
 
-                double[] sorted = durations.OrderBy(x => x).ToArray();
-                double   p95    = sorted[(int)(sorted.Length * 0.95)];
-                double   p95log = Math.Log10(Math.Max(0.1, p95));
+                double p95    = durations[(int)(durations.Length * 0.95)];
+                double p95log = Math.Log10(Math.Max(0.1, p95));
                 p95x = w * Math.Clamp((p95log - logMin) / (logMax - logMin), 0.01, 0.99);
             }
             else
@@ -709,7 +716,7 @@ namespace LogGuardV2
             var buckets = new[] { "LOG",      "NOTICE",   "WARNING",  "ERROR",    "CRITICAL" };
             var hexes   = new[] { "#10B981",  "#8B5CF6",  "#F59E0B",  "#E5484D",  "#E5484D"  };
 
-            var counts = new System.Collections.Generic.Dictionary<string, int>();
+            var counts = _levelCounts;
             foreach (var b in buckets) counts[b] = 0;
             foreach (var e in _entries)
             {
@@ -790,21 +797,22 @@ namespace LogGuardV2
 
             var top5 = _entries
                 .GroupBy(e => string.IsNullOrEmpty(e.Database) ? "(unknown)" : e.Database)
-                .OrderByDescending(g => g.Count())
+                .Select(g => (Key: g.Key, Count: g.Count()))
+                .OrderByDescending(g => g.Count)
                 .Take(5)
                 .ToArray();
 
             double canvasW  = TopDbCanvas.ActualWidth > 10 ? TopDbCanvas.ActualWidth : 360;
             const double nameW = 130, countW = 50, rowH = 28;
             double barAreaW = Math.Max(20, canvasW - nameW - countW - 8);
-            int    maxCount = top5[0].Count();
+            int    maxCount = top5[0].Count;
             var    accent   = (Color)ColorConverter.ConvertFromString("#4F8CFF");
 
             for (int i = 0; i < top5.Length; i++)
             {
                 var    grp  = top5[i];
                 double y    = i * rowH;
-                double barW = (double)grp.Count() / maxCount * barAreaW;
+                double barW = (double)grp.Count / maxCount * barAreaW;
 
                 var nameBlock = new TextBlock
                 {
@@ -840,7 +848,7 @@ namespace LogGuardV2
 
                 var countBlock = new TextBlock
                 {
-                    Text       = $"{grp.Count():N0}",
+                    Text       = $"{grp.Count:N0}",
                     Foreground = (Brush)FindResource("TextMuteBrush"),
                     FontFamily = new FontFamily("Consolas"),
                     FontSize   = 11

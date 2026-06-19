@@ -139,20 +139,19 @@ namespace LogGuardV2.src.Engine
         private void DoFlushStale(long maxAgeMs)
         {
             var now     = Environment.TickCount64;
-            var toFire  = new List<LogEntry>();
-            var toEvict = new List<int>();
+            var toEvict = new List<(int Pid, LogEntry Entry)>();
 
             foreach (var kvp in _pidPending)
             {
                 if (now - kvp.Value.CreatedTick >= maxAgeMs)
-                {
-                    toFire.Add(kvp.Value.Entry);
-                    toEvict.Add(kvp.Key);
-                }
+                    toEvict.Add((kvp.Key, kvp.Value.Entry));
             }
 
-            foreach (var pid in toEvict)  _pidPending.Remove(pid);
-            foreach (var entry in toFire) EntryDetected?.Invoke(entry);
+            foreach (var (pid, entry) in toEvict)
+            {
+                _pidPending.Remove(pid);
+                EntryDetected?.Invoke(entry);
+            }
         }
 
         private void ProcessLine(string line)
