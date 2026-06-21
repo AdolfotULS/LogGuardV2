@@ -52,6 +52,8 @@ namespace LogGuardV2.src.Engine
             {
                 if (_followRotation)
                     CheckRotation();
+                else
+                    EnsureStreamOpen();   // recover lost stream even without rotation
                 if (_currentFile != null)
                     ReadTail();
             }
@@ -60,11 +62,26 @@ namespace LogGuardV2.src.Engine
         private void CheckRotation()
         {
             var latest = FindLatestFile();
-            if (latest != null && latest != _currentFile)
+            if (latest == null) return;
+
+            if (latest != _currentFile)
             {
+                // New file detected — switch to it from the beginning
                 _currentFile = latest;
                 OpenFile(latest, 0);
             }
+            else if (_fileStream == null)
+            {
+                // Same file but stream was lost (transient lock) — reopen from last offset
+                OpenFile(_currentFile, _offset);
+            }
+        }
+
+        // Reopens the current file if the stream was lost without rotation
+        private void EnsureStreamOpen()
+        {
+            if (_currentFile != null && _fileStream == null)
+                OpenFile(_currentFile, _offset);
         }
 
         private void OpenFile(string path, long offset)

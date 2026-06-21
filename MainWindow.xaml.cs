@@ -291,6 +291,11 @@ namespace LogGuardV2
                         $"{entry.ThreatType} · {entry.UserHost} · {entry.Database}",
                         System.Windows.Forms.ToolTipIcon.Warning));
 
+            // Webhook alert — fire-and-forget; only when level >= AlertMinLevel
+            if (!string.IsNullOrEmpty(_currentSettings.AlertWebhookUrl) &&
+                LevelRank(entry.Level) >= LevelRank(_currentSettings.AlertMinLevel))
+                _ = SendAlertAsync(_currentSettings.AlertWebhookUrl, entry);
+
             if (entry.Duration > 0)
             {
                 Interlocked.Add(ref _durationSumUs, (long)(entry.Duration * 1000));
@@ -562,9 +567,67 @@ namespace LogGuardV2
                 "Pattern Test", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        // ─── Discord webhook test ─────────────────────────────────────────────────
+        // ─── Discord webhook alerts ───────────────────────────────────────────────
 
         private static readonly System.Net.Http.HttpClient _http = new();
+
+        private static int LevelRank(string level) => level?.ToUpperInvariant() switch
+        {
+            "CRITICAL" or "FATAL"   => 5,
+            "HIGH"     or "ERROR"   => 4,
+            "MEDIUM"   or "WARNING" => 3,
+            "LOW"      or "NOTICE"  => 2,
+            "LOG"                   => 1,
+            _                       => 0
+        };
+
+        private static async System.Threading.Tasks.Task SendAlertAsync(string url, LogEntry entry)
+        {
+            try
+            {
+                int color = entry.Level?.ToUpperInvariant() switch
+                {
+                    "CRITICAL" or "FATAL"   => 0xE5484D,
+                    "HIGH"     or "ERROR"   => 0xF04040,
+                    "MEDIUM"   or "WARNING" => 0xF59E0B,
+                    _                       => 0x8B5CF6
+                };
+
+                var threat = entry.IsInjected
+                    ? $"⚠️ **{entry.ThreatType}** detectado"
+                    : $"Nivel **{entry.Level}**";
+
+                var payload = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    username = "LogGuardV2",
+                    embeds   = new[]
+                    {
+                        new
+                        {
+                            title       = $"[{entry.Level}] {threat}",
+                            color,
+                            fields      = new[]
+                            {
+                                new { name = "Usuario @ Host", value = entry.UserHost,  inline = true  },
+                                new { name = "Base de datos",  value = string.IsNullOrEmpty(entry.Database) ? "—" : entry.Database, inline = true  },
+                                new { name = "PID",            value = entry.Pid.ToString(), inline = true  },
+                                new { name = "Duración",       value = $"{entry.Duration:F1} ms", inline = true  },
+                                new { name = "Timestamp",      value = entry.Timestamp,   inline = false },
+                                new { name = "Query",          value = entry.Query.Length > 1000 ? entry.Query[..1000] + "…" : entry.Query, inline = false }
+                            },
+                            footer = new { text = "LogGuardV2 · Sistema de detección de amenazas" }
+                        }
+                    }
+                });
+
+                var content = new System.Net.Http.StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+                await _http.PostAsync(url, content).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Swallow — alert failures must never crash the detection pipeline
+            }
+        }
 
         private async void BtnTestWebhook_Click(object s, RoutedEventArgs e)
         {

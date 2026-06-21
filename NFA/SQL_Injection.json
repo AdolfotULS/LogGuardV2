@@ -40,7 +40,7 @@
     {
       "id": "q_tbl",
       "isStart": false,
-      "isAccept": true
+      "isAccept": false
     },
     {
       "id": "q_where",

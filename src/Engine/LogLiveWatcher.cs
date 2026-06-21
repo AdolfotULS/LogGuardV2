@@ -51,6 +51,12 @@ namespace LogGuardV2.src.Engine
         private const int BfThreshold = 5;
         private static readonly TimeSpan BfWindowDuration = TimeSpan.FromMinutes(1);
 
+        // A3b: retroactive BF confirmation
+        // _bfCandidatePid: PID of a BF-pattern statement waiting for Duration + threshold confirmation
+        private readonly Dictionary<int, (string Key, string Severity)> _bfCandidatePid = new();
+        // _bfBuffer: per-key queue of entries (Duration already set) waiting for threshold to be reached
+        private readonly Dictionary<string, Queue<LogEntry>> _bfBuffer = new();
+
         // M5: multi-line accumulation - only accessed from OnNewLines (under file-watcher lock)
         private string? _pendingLine;
 
@@ -182,6 +188,7 @@ namespace LogGuardV2.src.Engine
                 _pidCtx.Remove(pid);
                 _pidHost.Remove(pid);
                 _pidPending.Remove(pid);
+                _bfCandidatePid.Remove(pid);
                 return;
             }
 
@@ -192,7 +199,32 @@ namespace LogGuardV2.src.Engine
                 if (_pidPending.Remove(pid, out var pending))
                 {
                     pending.Entry.Duration = pg.DurationMs ?? 0;
-                    EntryDetected?.Invoke(pending.Entry);
+
+                    // A3b: if this was a buffered BF candidate, decide now
+                    if (_bfCandidatePid.Remove(pid, out var candidate))
+                    {
+                        var (bfKey, bfSev) = candidate;
+                        if (_bfWindow.TryGetValue(bfKey, out var wq) && wq.Count >= BfThreshold)
+                        {
+                            // Threshold already reached (by a later statement) — upgrade and fire
+                            UpgradeEntryToBf(pending.Entry, bfSev);
+                            EntryDetected?.Invoke(pending.Entry);
+                            FlushBfBuffer(bfKey, bfSev);
+                        }
+                        else
+                        {
+                            // Still below threshold — queue entry; cap buffer to avoid unbounded growth
+                            if (!_bfBuffer.TryGetValue(bfKey, out var buf))
+                                _bfBuffer[bfKey] = buf = new Queue<LogEntry>();
+                            if (buf.Count >= BfThreshold - 1)
+                                EntryDetected?.Invoke(buf.Dequeue()); // oldest: fire as non-injected
+                            buf.Enqueue(pending.Entry);
+                        }
+                    }
+                    else
+                    {
+                        EntryDetected?.Invoke(pending.Entry);
+                    }
                 }
                 return;
             }
@@ -210,11 +242,24 @@ namespace LogGuardV2.src.Engine
             var tokens        = SqlTokenizer.Tokenize(pg.Message);
             var matchedEngine = RunEngines(tokens);
 
-            // A3: brute-force requires rate confirmation, not just pattern match
+            // A3: brute-force requires rate confirmation, not just pattern match.
+            // Use prefix fields (pg.User/pg.Host) as fallback so the key is stable
+            // even when _pidCtx was not yet populated for this PID.
+            // Unconfirmed candidates are buffered and retroactively marked when threshold hits.
             if (matchedEngine?.ThreatType == "BRUTEFORCE")
             {
-                var key = $"{ctx.User ?? "unknown"}@{ctx.Host ?? pg.Host ?? "unknown"}";
-                if (!IsBruteForce(key)) matchedEngine = null;
+                var key = $"{ctx.User ?? pg.User ?? "unknown"}@{ctx.Host ?? pg.Host ?? "unknown"}";
+                if (IsBruteForce(key))
+                {
+                    // Threshold reached — flush buffered candidates for this key
+                    FlushBfBuffer(key, matchedEngine.Severity);
+                }
+                else
+                {
+                    // Not confirmed yet — stash the candidate and build entry as non-injected
+                    _bfCandidatePid[pid2] = (key, matchedEngine.Severity);
+                    matchedEngine = null;
+                }
             }
 
             var level = matchedEngine != null
@@ -236,6 +281,26 @@ namespace LogGuardV2.src.Engine
 
             // D1: buffer until paired Duration line fires the entry
             _pidPending[pid2] = (entry, Environment.TickCount64);
+        }
+
+        // A3b: mark a log entry as confirmed brute-force
+        private static void UpgradeEntryToBf(LogEntry e, string severity)
+        {
+            e.IsInjected = true;
+            e.ThreatType = "BRUTEFORCE";
+            e.Level      = !string.IsNullOrEmpty(severity) ? severity.ToUpperInvariant() : "MEDIUM";
+        }
+
+        // A3b: fire all buffered candidates for a key as confirmed brute-force
+        private void FlushBfBuffer(string key, string severity)
+        {
+            if (!_bfBuffer.Remove(key, out var buf)) return;
+            while (buf.Count > 0)
+            {
+                var e = buf.Dequeue();
+                UpgradeEntryToBf(e, severity);
+                EntryDetected?.Invoke(e);
+            }
         }
 
         // A3: sliding-window counter per attacker key
