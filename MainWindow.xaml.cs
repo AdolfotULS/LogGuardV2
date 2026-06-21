@@ -455,6 +455,26 @@ namespace LogGuardV2
 
         // ─── Settings ─────────────────────────────────────────────────────────────
 
+        private static void SetComboByContent(ComboBox combo, string value, string fallback)
+        {
+            foreach (ComboBoxItem item in combo.Items)
+            {
+                if (string.Equals(item.Content?.ToString(), value, StringComparison.OrdinalIgnoreCase))
+                {
+                    combo.SelectedItem = item;
+                    return;
+                }
+            }
+            foreach (ComboBoxItem item in combo.Items)
+            {
+                if (string.Equals(item.Content?.ToString(), fallback, StringComparison.OrdinalIgnoreCase))
+                {
+                    combo.SelectedItem = item;
+                    return;
+                }
+            }
+        }
+
         private void LoadSettingsToForm()
         {
             var s = SettingsService.Load();
@@ -471,7 +491,7 @@ namespace LogGuardV2
             TogRawMessage.IsChecked      = s.ParseRawMessage;
             TogRedactPasswords.IsChecked = s.RedactPasswords;
             TxtWebhookUrl.Text                  = s.AlertWebhookUrl;
-            TxtMinLevel.Text                    = s.AlertMinLevel;
+            SetComboByContent(CmbMinLevel, s.AlertMinLevel, "ERROR");
             TogDesktopNotifications.IsChecked   = s.DesktopNotifications;
             TogAudioBeepOnFatal.IsChecked        = s.AudioBeepOnFatal;
         }
@@ -491,7 +511,7 @@ namespace LogGuardV2
             ParseRawMessage        = TogRawMessage.IsChecked        == true,
             RedactPasswords        = TogRedactPasswords.IsChecked   == true,
             AlertWebhookUrl        = TxtWebhookUrl.Text.Trim(),
-            AlertMinLevel          = TxtMinLevel.Text.Trim(),
+            AlertMinLevel          = (CmbMinLevel.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "ERROR",
             DesktopNotifications   = TogDesktopNotifications.IsChecked == true,
             AudioBeepOnFatal       = TogAudioBeepOnFatal.IsChecked     == true
         };

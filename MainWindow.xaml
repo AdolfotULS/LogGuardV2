@@ -827,12 +827,13 @@
                                             <StackPanel Grid.Column="2">
                                                 <TextBlock Text="MINIMUM LEVEL" FontFamily="Segoe UI" FontSize="10"
                                                            Foreground="{StaticResource TextMuteBrush}" Margin="0,0,0,6"/>
-                                                <Border Background="{StaticResource Bg1}" BorderBrush="{StaticResource LineBrush}"
-                                                        BorderThickness="1" Height="32" Padding="10,0">
-                                                    <TextBox x:Name="TxtMinLevel" Text="ERROR" Background="Transparent" BorderThickness="0"
-                                                             Foreground="{StaticResource TextBrush}" FontFamily="Consolas" FontSize="12"
-                                                             VerticalAlignment="Center" CaretBrush="{StaticResource AccentBrush}"/>
-                                                </Border>
+                                                <ComboBox x:Name="CmbMinLevel" Style="{StaticResource DarkComboBox}">
+                                                    <ComboBoxItem Content="LOG"/>
+                                                    <ComboBoxItem Content="NOTICE"/>
+                                                    <ComboBoxItem Content="WARNING"/>
+                                                    <ComboBoxItem Content="ERROR"/>
+                                                    <ComboBoxItem Content="CRITICAL"/>
+                                                </ComboBox>
                                             </StackPanel>
                                         </Grid>
                                         <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,8">

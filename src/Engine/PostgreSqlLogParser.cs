@@ -44,9 +44,12 @@ namespace LogGuardV2.src.Engine
 
     public static class PostgreSqlLogParser
     {
-        // Timestamp and timezone captured separately to support non-UTC servers
+        // Timestamp and timezone captured separately to support non-UTC servers.
+        // Supports two log_line_prefix styles:
+        //   %m format (with ms): "2026-06-21 20:10:15.123 UTC [38] LOG:  message"
+        //   %t format (no ms):   "2026-06-21 20:10:15 UTC [38]: [1-1] user=u,db=d,app=a,client=h LOG:  message"
         private static readonly Regex HeaderRegex = new(
-            @"^(?<ts>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+(?<tz>\S+)\s+\[(?<pid>\d+)\]\s+(?<severity>[A-Z]+):\s{1,}(?<message>[\s\S]*)$",
+            @"^(?<ts>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\s+(?<tz>\S+)\s+\[(?<pid>\d+)\](?::\s+\[\d+-\d+\]\s+user=(?<pfxuser>[^,]*),db=(?<pfxdb>[^,]*),app=(?<pfxapp>[^,]*),client=(?<pfxclient>\S*)\s+)?\s*(?<severity>[A-Z]+):\s{1,}(?<message>[\s\S]*)$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private static readonly Regex StatementRegex = new(
@@ -87,7 +90,8 @@ namespace LogGuardV2.src.Engine
             var tsStr = headerMatch.Groups["ts"].Value;
             var tzStr = headerMatch.Groups["tz"].Value;
 
-            if (!DateTime.TryParseExact(tsStr, "yyyy-MM-dd HH:mm:ss.fff",
+            if (!DateTime.TryParseExact(tsStr,
+                    new[] { "yyyy-MM-dd HH:mm:ss.fff", "yyyy-MM-dd HH:mm:ss" },
                     CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
                 return false;
 
@@ -102,6 +106,14 @@ namespace LogGuardV2.src.Engine
                 Message   = message,
                 Type      = PgLogLineType.General
             };
+
+            // Populate prefix context when log_line_prefix includes user/db/client fields
+            var pfxUser   = headerMatch.Groups["pfxuser"];
+            var pfxDb     = headerMatch.Groups["pfxdb"];
+            var pfxClient = headerMatch.Groups["pfxclient"];
+            if (pfxUser.Success   && pfxUser.Length   > 0) entry.User     = pfxUser.Value;
+            if (pfxDb.Success     && pfxDb.Length     > 0) entry.Database = pfxDb.Value;
+            if (pfxClient.Success && pfxClient.Length > 0) entry.Host     = pfxClient.Value;
 
             ParseTypedMessage(message, entry);
             return true;

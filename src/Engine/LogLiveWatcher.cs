@@ -226,8 +226,8 @@ namespace LogGuardV2.src.Engine
                 Timestamp  = pg.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff UTC"),
                 Pid        = pid2,
                 Level      = level,
-                UserHost   = $"{ctx.User ?? pg.Identity ?? "unknown"}@{ctx.Host ?? pg.Host ?? "unknown"}",
-                Database   = !string.IsNullOrEmpty(ctx.Database) ? ctx.Database : (pg.Database ?? ""),
+                UserHost   = $"{ctx.User ?? pg.User ?? pg.Identity ?? "unknown"}@{ctx.Host ?? pg.Host ?? "unknown"}",
+                Database   = !string.IsNullOrEmpty(ctx.Database) ? ctx.Database : (!string.IsNullOrEmpty(pg.Database) ? pg.Database : ""),
                 Query      = pg.Message,
                 Duration   = 0,   // populated when the matching Duration line arrives
                 IsInjected = matchedEngine != null,
