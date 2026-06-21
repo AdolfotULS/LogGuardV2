@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: bd_simulator
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: S3cur3P@ss2024!
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./logs:/var/log/postgresql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: >
+      postgres
+      -c logging_collector=on
+      -c log_directory=/var/log/postgresql
+      -c log_filename=postgresql-%Y-%m-%d_%H%M%S.log
+      -c log_statement=all
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_duration=on
+      -c log_min_duration_statement=0
+      -c log_line_prefix="%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
+      -c log_error_verbosity=default
+      -c log_hostname=on
+      -c log_lock_waits=on
+      -c deadlock_timeout=1s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
