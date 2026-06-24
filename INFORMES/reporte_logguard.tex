@@ -1,0 +1,1050 @@
+%-----------------------------------------------------------------------
+% Reporte LogGuard V2 — Autómata Finito No Determinista para
+% Detección de Amenazas en Logs de PostgreSQL
+% Autor: Adolfo Toledo
+%-----------------------------------------------------------------------
+\documentclass[12pt, a4paper]{report}
+
+%---------- Paquetes ---------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish, es-noquoting]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage[hypertexnames=false]{hyperref}
+
+\usetikzlibrary{automata, positioning, arrows.meta, fit, decorations.pathreplacing}
+
+\geometry{
+  top=2.5cm, bottom=2.5cm,
+  left=3cm, right=2.5cm
+}
+\setlength{\headheight}{15pt}
+\setlength{\emergencystretch}{3em}
+\hbadness=10000
+\vbadness=10000
+
+%---------- Colores ----------------------------------------------------
+\definecolor{codeblue}{RGB}{0,80,180}
+\definecolor{codegray}{RGB}{128,128,128}
+\definecolor{codegreen}{RGB}{0,140,0}
+\definecolor{codebg}{RGB}{248,248,250}
+\definecolor{accent}{RGB}{30,90,200}
+\definecolor{danger}{RGB}{200,30,30}
+\definecolor{success}{RGB}{30,160,60}
+
+%---------- Listings ---------------------------------------------------
+\lstdefinestyle{json}{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{codegray!50},
+  numbers=left,
+  numberstyle=\tiny\color{codegray},
+  keywordstyle=\color{codeblue}\bfseries,
+  stringstyle=\color{codegreen},
+  commentstyle=\color{codegray}\itshape,
+  tabsize=2,
+  showstringspaces=false,
+  captionpos=b
+}
+
+\lstdefinestyle{csharp}{
+  language={[Sharp]C},
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{codegray!50},
+  numbers=left,
+  numberstyle=\tiny\color{codegray},
+  keywordstyle=\color{codeblue}\bfseries,
+  stringstyle=\color{codegreen},
+  commentstyle=\color{codegray}\itshape,
+  tabsize=2,
+  showstringspaces=false,
+  captionpos=b
+}
+
+%---------- Encabezados ------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small LogGuard V2 — Reporte Técnico}
+\fancyhead[R]{\small Adolfo Toledo}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+%---------- Teoremas ---------------------------------------------------
+\theoremstyle{definition}
+\newtheorem{definicion}{Definición}[chapter]
+\newtheorem{ejemplo}{Ejemplo}[chapter]
+\theoremstyle{remark}
+\newtheorem{nota}{Nota}[chapter]
+
+%---------- Comandos auxiliares ----------------------------------------
+\newcommand{\tok}[1]{\texttt{\color{codeblue}#1}}
+\newcommand{\state}[1]{\ensuremath{q_{\text{#1}}}}
+\newcommand{\nfa}[1]{\ensuremath{\mathcal{#1}}}
+\newcommand{\severity}[2]{\textbf{\color{#1}#2}}
+
+%=======================================================================
+\begin{document}
+\pagenumbering{roman}
+%=======================================================================
+
+%----------------------------------------------------------------------
+% PORTADA
+%----------------------------------------------------------------------
+\begin{titlepage}
+  \centering
+
+  \vspace*{1.5cm}
+
+  {\Huge\bfseries\color{accent} LogGuard V2}\\[0.4cm]
+  {\Large Reporte Técnico de Autómatas Finitos No Deterministas}\\[0.3cm]
+  {\large Detección de Amenazas en Logs de PostgreSQL}
+
+  \vspace{1cm}
+  \rule{12cm}{0.8pt}
+  \vspace{1cm}
+
+  \begin{minipage}{0.85\textwidth}
+    \centering
+    {\normalsize
+    Este documento presenta la descripción formal del lenguaje de patrones de
+    ataque reconocido por LogGuard V2, incluyendo la definición del sistema
+    de autómatas finitos no deterministas, diagramas de estados, tablas de
+    transiciones, decisiones de diseño y análisis de cadenas de prueba.
+    }
+  \end{minipage}
+
+  \vspace{2.5cm}
+
+  \begin{tabular}{rl}
+    \textbf{Autor:}    & Adolfo Toledo \\[0.3cm]
+    \textbf{Versión:}  & 2.1.0 \\[0.3cm]
+    \textbf{Fecha:}    & Junio 2026 \\[0.3cm]
+    \textbf{Plataforma:} & .NET 10.0 / Windows / WPF \\[0.3cm]
+    \textbf{Tecnología:} & Autómata Finito No Determinista (NFA) \\
+  \end{tabular}
+
+  \vspace{3cm}
+  \rule{12cm}{0.4pt}
+  \vspace{0.5cm}
+
+  {\small Universidad --- Teoría de la Computación}
+
+  \vfill
+\end{titlepage}
+
+%----------------------------------------------------------------------
+% ÍNDICE
+%----------------------------------------------------------------------
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+%======================================================================
+\chapter{Descripción del Lenguaje}
+%======================================================================
+
+\section{Contexto del Sistema}
+
+LogGuard V2 es una aplicación de seguridad en tiempo real que monitorea archivos
+de registro (\emph{logs}) de instancias PostgreSQL. Su objetivo es detectar
+comportamientos maliciosos en consultas SQL antes de que causen daño. El sistema
+lee logs en formato estándar de PostgreSQL, extrae las sentencias SQL, las
+tokeniza y aplica un conjunto de Autómatas Finitos No Deterministas (NFA) para
+clasificar cada consulta como \emph{benigna} o \emph{amenaza}.
+
+\section{El Lenguaje de Entrada}
+
+El sistema opera sobre dos capas de lenguaje:
+
+\subsection{Capa 1 — Formato de Log de PostgreSQL}
+
+Las líneas de log siguen una de dos plantillas de prefijo configurables en
+\texttt{postgresql.conf} mediante el parámetro \texttt{log\_line\_prefix}:
+
+\begin{center}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Estilo} & \textbf{Prefijo} & \textbf{Ejemplo} \\
+  \midrule
+  \texttt{\%m} & \texttt{\%m [\%p] \%q\%u@\%h \%d} &
+    \texttt{2026-06-21 20:10:15.123 UTC [1234] app@10.0.0.1 mydb} \\
+  \texttt{\%t} & \texttt{\%t [\%p]: [\%l-\%s] user=\%u,...} &
+    \texttt{2026-06-21 20:10:15 UTC [1234]: [1-1] user=app,db=mydb} \\
+  \bottomrule
+\end{tabular}%
+}
+\end{center}
+
+Cada línea contiene: \emph{timestamp} (ISO~8601 + zona horaria), PID del proceso,
+nivel de severidad (\texttt{LOG}, \texttt{ERROR}, \texttt{FATAL}, etc.),
+y el cuerpo del mensaje. Los tipos de línea reconocidos son:
+
+\begin{description}[leftmargin=3cm, labelindent=0.5cm]
+  \item[\texttt{Statement}] Consulta SQL ejecutada (\texttt{statement: <sql>}).
+  \item[\texttt{Duration}]  Tiempo de ejecución en ms (\texttt{duration: X.Y ms}).
+  \item[\texttt{ConnectionReceived}] Nueva conexión entrante con host y puerto.
+  \item[\texttt{ConnectionAuthenticated}] Método de autenticación usado.
+  \item[\texttt{ConnectionAuthorized}]   Sesión autorizada: usuario y base de datos.
+  \item[\texttt{Disconnection}] Cierre de sesión con resumen de duración.
+  \item[\texttt{General}] Mensaje de log sin campos estructurados adicionales.
+  \item[\texttt{Unknown}] Línea no reconocida por ningún patrón.
+\end{description}
+
+\subsection{Capa 2 — Lenguaje de Tokens SQL}
+
+Una vez extraída la sentencia SQL del campo \texttt{statement:}, el sistema la
+transforma mediante un proceso de cuatro fases en una \emph{secuencia de tokens}.
+Esta secuencia es el \textbf{lenguaje de entrada formal} para los autómatas.
+
+El alfabeto $\Sigma$ del lenguaje está compuesto por más de 70 categorías de
+tokens, agrupadas en:
+
+\begin{center}
+\begin{tabularx}{\textwidth}{lX}
+  \toprule
+  \textbf{Categoría} & \textbf{Tokens representativos} \\
+  \midrule
+  Estructura de consulta & \tok{SELECT}, \tok{FROM}, \tok{WHERE}, \tok{JOIN},
+                           \tok{UNION}, \tok{UNION\_ALL}, \tok{GROUP}, \tok{ORDER} \\
+  Comparación lógica     & \tok{OR}, \tok{AND}, \tok{NOT}, \tok{IN}, \tok{LIKE},
+                           \tok{EQUALS}, \tok{NEQ}, \tok{GT}, \tok{LT} \\
+  DML                    & \tok{INSERT}, \tok{UPDATE}, \tok{DELETE}, \tok{MERGE},
+                           \tok{VALUES}, \tok{RETURNING} \\
+  DDL / Privilegios      & \tok{CREATE}, \tok{DROP}, \tok{ALTER}, \tok{GRANT},
+                           \tok{REVOKE}, \tok{SUPERUSER} \\
+  Funciones peligrosas   & \tok{SLEEP}, \tok{BENCHMARK}, \tok{WAITFOR\_DELAY},
+                           \tok{XP\_CMDSHELL}, \tok{LOAD\_FILE} \\
+  Tablas del sistema     & \tok{INFORMATION\_SCHEMA}, \tok{PG\_SHADOW},
+                           \tok{PG\_USER}, \tok{PG\_ROLES} \\
+  Especiales             & \tok{TAUTOLOGY}, \tok{COMMENT}, \tok{STAR} \\
+  Primitivos             & \tok{STRING}, \tok{NUMBER}, \tok{IDENT},
+                           \tok{SEMICOLON}, \tok{LPAREN}, \tok{RPAREN} \\
+  \bottomrule
+\end{tabularx}
+\end{center}
+
+El token \tok{TAUTOLOGY} no proviene del léxico SQL estándar sino que es
+generado en la \emph{Fase~2} del tokenizador cuando se detecta una expresión
+lógicamente siempre verdadera (e.g., \texttt{1=1}, \texttt{'x'='x'}, \texttt{a=a}).
+
+\section{Pipeline de Procesamiento}
+
+El flujo completo desde el archivo de log hasta la alerta es:
+
+\begin{enumerate}
+  \item \textbf{Lectura reactiva:} \texttt{FileWatcherLive} lee el archivo con
+        sondeo cada 500~ms, detecta rotación por cambio de \emph{inode} y
+        maneja líneas de continuación multi-línea.
+  \item \textbf{Parseo de log:} \texttt{PostgreSqlLogParser} aplica 7 expresiones
+        regulares precompiladas para clasificar cada línea y extraer metadatos
+        estructurados.
+  \item \textbf{Tokenización SQL:} \texttt{SqlTokenizer} ejecuta 4 fases secuenciales.
+  \item \textbf{Evaluación NFA:} \texttt{NfaEngine} ejecuta todos los perfiles NFA
+        habilitados sobre la secuencia de tokens.
+  \item \textbf{Alerta:} Si algún NFA acepta, se genera una entrada en la bitácora
+        de amenazas con nivel de severidad y tipo de ataque.
+\end{enumerate}
+
+\section{Fases del Tokenizador}
+
+\begin{description}[leftmargin=3.5cm]
+  \item[Fase 1 — Normalización] Se eliminan comentarios SQL (\texttt{--},
+        \texttt{/* */}), se decodifican literales hexadecimales
+        (\texttt{0x41} $\to$ \texttt{A}) y se unifican espacios blancos.
+  \item[Fase 2 — Detección de tautologías] Se aplican 5 expresiones regulares
+        acotadas para identificar expresiones siempre verdaderas y sustituirlas
+        por el marcador \tok{TAUTOLOGY}.
+  \item[Fase 3 — Escaneo léxico] Se recorre el texto normalizado carácter a
+        carácter y se emiten tokens usando un diccionario de 160 entradas y
+        expresiones regulares para literales.
+  \item[Fase 4 — Fusión] Pares de tokens adyacentes se combinan donde
+        corresponde (e.g., \tok{UNION} + \tok{ALL} $\to$ \tok{UNION\_ALL}).
+\end{description}
+
+%======================================================================
+\chapter{Definición Formal}
+%======================================================================
+
+\section{Autómata Finito No Determinista (NFA)}
+
+\begin{definicion}[Autómata Finito No Determinista]
+Un NFA se define como una 5-tupla
+\[
+  \nfa{M} = (Q,\; \Sigma,\; \delta,\; q_0,\; F)
+\]
+donde:
+\begin{itemize}
+  \item $Q$ es el conjunto finito de estados,
+  \item $\Sigma$ es el alfabeto finito de símbolos de entrada (tokens SQL),
+  \item $\delta : Q \times \Sigma \to \mathcal{P}(Q)$ es la función de
+        transición no determinista,
+  \item $q_0 \in Q$ es el estado inicial,
+  \item $F \subseteq Q$ es el conjunto de estados de aceptación.
+\end{itemize}
+\end{definicion}
+
+\begin{definicion}[Lenguaje aceptado]
+El lenguaje aceptado por $\nfa{M}$ es
+\[
+  L(\nfa{M}) = \{ w \in \Sigma^* \mid \hat\delta(\{q_0\}, w) \cap F \neq \emptyset \}
+\]
+donde $\hat\delta$ es la extensión de $\delta$ a cadenas.
+\end{definicion}
+
+\begin{definicion}[Subcadena aceptada — modo substring]
+LogGuard opera en modo de reconocimiento de \emph{subcadena}: el estado inicial
+$q_0$ se reinyecta al conjunto activo en cada paso, de modo que el autómata
+detecta el patrón en cualquier posición dentro de la secuencia de tokens:
+\[
+  \text{match}(w) = \exists\, 0 \le i \le j \le |w| : \hat\delta(\{q_0\}, w[i..j]) \cap F \neq \emptyset
+\]
+\end{definicion}
+
+\section{Perfil de Amenaza}
+
+Cada perfil NFA en LogGuard amplía la definición estándar con dos elementos:
+
+\begin{definicion}[Perfil NFA con restricción negativa]
+Un perfil NFA extendido es una 7-tupla
+\[
+  \nfa{P} = (Q,\; \Sigma,\; \delta,\; q_0,\; F,\; T,\; \mathit{absent})
+\]
+donde:
+\begin{itemize}
+  \item $T$ es el tipo de amenaza (\textsc{sqli}, \textsc{exfil},
+        \textsc{privesc}, \textsc{bruteforce}, \textsc{discovery}),
+  \item $\mathit{absent} \subseteq \Sigma$ es el conjunto de tokens cuya
+        \emph{presencia} en $w$ invalida la aceptación.
+\end{itemize}
+La aceptación final se define:
+\[
+  \text{accept}(w) = \bigl[\hat\delta(\{q_0\},w) \cap F \neq \emptyset\bigr]
+                   \;\wedge\; \forall\, a \in \mathit{absent} : a \notin w
+\]
+\end{definicion}
+
+\section{Algoritmo de Simulación}
+
+El algoritmo implementado en \texttt{NfaEngine.Run} es una simulación de
+subconjuntos incremental de complejidad $O(|w| \cdot |Q|)$:
+
+\begin{lstlisting}[style=csharp, caption={Núcleo del motor NFA (NfaEngine.cs)}]
+HashSet<string> active = new() { startState };
+
+foreach (string token in tokens)
+{
+    var next = new HashSet<string> { startState };  // modo substring
+
+    foreach (string state in active)
+        if (_delta.TryGetValue((state, token), out var targets))
+            next.UnionWith(targets);
+
+    active = next;
+
+    if (active.Overlaps(_acceptStates))
+        if (!tokens.Intersect(profile.RequireAbsentTokens).Any())
+            return true;
+}
+return false;
+\end{lstlisting}
+
+\section{Inventario de Perfiles NFA}
+
+LogGuard incluye 6 perfiles NFA cargados desde archivos JSON en tiempo de
+ejecución mediante \texttt{NfaLoader}:
+
+\begin{center}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccl}
+  \toprule
+  \textbf{Perfil} & \textbf{ID} & \textbf{Estados} & \textbf{Transiciones}
+                  & \textbf{Severidad} \\
+  \midrule
+  SQL Injection      & \texttt{pgsql-sqli-v2}        & 10 & 29
+    & \severity{danger}{High} \\
+  Data Exfiltration  & \texttt{pgsql-exfil-v1}       & 5  & 6
+    & \severity{danger}{High} \\
+  Privilege Escal.   & \texttt{pgsql-privesc-v1}     & 6  & 7
+    & \severity{danger}{Critical} \\
+  Discovery/Enum.    & \texttt{pgsql-discovery-v2}   & 4  & 5
+    & \severity{codegray}{Medium} \\
+  Brute Force        & \texttt{pgsql-bruteforce-v1}  & 8  & 8
+    & \severity{codegray}{Medium} \\
+  Time-Based SQLi    & \texttt{pgsql-time-sqli-v2}   & 5  & 6
+    & \severity{danger}{High} \\
+  \bottomrule
+\end{tabular}%
+}
+\end{center}
+
+%======================================================================
+\chapter{Diagramas de Autómatas}
+%======================================================================
+
+Esta sección presenta los diagramas de transición de estados para los tres
+perfiles más relevantes: SQL Injection, Data Exfiltration y Privilege Escalation.
+
+%----------------------------------------------------------------------
+\section{NFA — Inyección SQL (\texttt{pgsql-sqli-v2})}
+
+El autómata de inyección SQL reconoce cinco patrones de ataque:
+tautología directa, bypass OR, UNION injection, funciones de tiempo
+(\texttt{SLEEP}/\texttt{BENCHMARK}) y enumeración de esquemas
+(\texttt{INFORMATION\_SCHEMA}).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  ->, >=Stealth,
+  node distance=2.8cm,
+  every state/.style={draw, circle, minimum size=1.0cm, font=\scriptsize},
+  accepting/.style={double},
+  initial text=,
+  auto
+]
+
+% Estados
+\node[state, initial]                    (q0)      {$q_0$};
+\node[state, right of=q0]               (qpre)    {$q_p$};
+\node[state, right of=qpre]             (qtbl)    {$q_t$};
+\node[state, right of=qtbl]             (qwhere)  {$q_w$};
+\node[state, below of=qwhere]           (qcol)    {$q_c$};
+\node[state, left of=qcol]              (qeq)     {$q_e$};
+\node[state, left of=qeq]               (qval)    {$q_v$};
+\node[state, below of=q0, yshift=-1cm]  (qor)     {$q_{or}$};
+\node[state, right of=qor, xshift=1.5cm](qunion)  {$q_u$};
+\node[state, accepting,
+      below of=qval, yshift=-0.5cm]     (qsqli)   {\textbf{$q_!$}};
+
+% --- Transiciones desde q0 ---
+\draw (q0)     edge[bend left=10]  node[above]{\scriptsize SELECT}     (qpre);
+\draw (q0)     edge[bend left=40]  node[above, sloped]{\scriptsize TAUTOLOGY / SLEEP / IS} (qsqli);
+\draw (q0)     edge               node[left]{\scriptsize OR}           (qor);
+\draw (q0)     edge[bend right=10] node[below]{\scriptsize UNION/U\_A} (qunion);
+
+% --- Camino principal ---
+\draw (qpre)   edge[loop above]    node{\scriptsize IDENT/STAR}        (qpre);
+\draw (qpre)   edge               node[above]{\scriptsize FROM}        (qtbl);
+\draw (qpre)   edge[bend right=45] node[right, sloped]{\scriptsize SLEEP} (qsqli);
+
+\draw (qtbl)   edge[loop above]    node{\scriptsize IDENT}             (qtbl);
+\draw (qtbl)   edge               node[right]{\scriptsize WHERE}       (qwhere);
+\draw (qtbl)   edge[bend right=30] node[above, sloped]{\scriptsize IS/SEMI} (qsqli);
+
+\draw (qwhere) edge               node[right]{\scriptsize IDENT}       (qcol);
+\draw (qwhere) edge[bend left=35] node[above, sloped]{\scriptsize TAUTO/SEMI} (qsqli);
+
+\draw (qcol)   edge               node[below]{\scriptsize EQUALS}      (qeq);
+
+\draw (qeq)    edge               node[below]{\scriptsize STR/NUM}     (qval);
+
+\draw (qval)   edge               node[left]{\scriptsize OR/UNION/\ldots} (qsqli);
+
+% --- Bypass OR ---
+\draw (qor)    edge[bend right=10] node[below]{\scriptsize TAUTO/NUM/STR} (qsqli);
+
+% --- UNION path ---
+\draw (qunion) edge[bend right=10] node[above]{\scriptsize SELECT}     (qsqli);
+
+% --- q_sqli loops ---
+\draw (qsqli)  edge[loop right]    node{\scriptsize SELECT/TAUTO/\ldots} (qsqli);
+
+\end{tikzpicture}
+\caption{NFA para detección de SQL Injection (\texttt{pgsql-sqli-v2}).
+  $q_0$=inicial; $q_!$=aceptación; abreviaturas: IS=INFORMATION\_SCHEMA,
+  U\_A=UNION\_ALL, TAUTO=TAUTOLOGY, SEMI=SEMICOLON.}
+\label{fig:nfa-sqli}
+\end{figure}
+
+%----------------------------------------------------------------------
+\section{NFA — Escalada de Privilegios}
+\noindent\textbf{Perfil:} \texttt{pgsql-privesc-v1}.
+
+Este autómata reconoce la sentencia \texttt{ALTER USER/ROLE <nombre> [WITH] SUPERUSER},
+usada para conceder acceso de superusuario en PostgreSQL. Tiene 6 estados y 7
+transiciones, lo que lo hace altamente preciso con mínimos falsos positivos.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  ->, >=Stealth,
+  node distance=2.6cm,
+  every state/.style={draw, circle, minimum size=1.0cm, font=\small},
+  accepting/.style={double},
+  initial text=,
+  auto
+]
+
+\node[state, initial]           (q0)     {$q_0$};
+\node[state, right of=q0]       (qalt)   {$q_a$};
+\node[state, right of=qalt]     (qtgt)   {$q_t$};
+\node[state, right of=qtgt]     (qname)  {$q_n$};
+\node[state, right of=qname]    (qwith)  {$q_w$};
+\node[state, accepting,
+      below of=qname, yshift=0.4cm]
+                                 (qsuper) {\textbf{$q_s$}};
+
+\draw (q0)    edge node[above]{\small ALTER}     (qalt);
+\draw (qalt)  edge node[above]{\small USER}      (qtgt);
+\draw (qalt)  edge[bend right=30] node[below]{\small ROLE} (qtgt);
+\draw (qtgt)  edge node[above]{\small IDENT}     (qname);
+\draw (qname) edge node[above]{\small WITH}      (qwith);
+\draw (qname) edge node[right]{\small SUPERUSER} (qsuper);
+\draw (qwith) edge node[right]{\small SUPERUSER} (qsuper);
+
+\end{tikzpicture}
+\caption{NFA para detección de Privilege Escalation (\texttt{pgsql-privesc-v1}).
+  $q_0$=inicial; $q_s$=aceptación (Critical).}
+\label{fig:nfa-privesc}
+\end{figure}
+
+%----------------------------------------------------------------------
+\section{NFA — Exfiltración de Datos (\texttt{pgsql-exfil-v1})}
+
+Detecta volcados masivos: \texttt{SELECT */cols FROM tabla} sin cláusula
+\texttt{WHERE} ni \texttt{LIMIT}. La restricción negativa ($\mathit{absent} =
+\{\tok{WHERE}, \tok{LIMIT}\}$) es el elemento clave.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  ->, >=Stealth,
+  node distance=2.8cm,
+  every state/.style={draw, circle, minimum size=1.0cm, font=\small},
+  accepting/.style={double},
+  initial text=,
+  auto
+]
+
+\node[state, initial]          (q0)   {$q_0$};
+\node[state, right of=q0]      (qsel) {$q_{sel}$};
+\node[state, right of=qsel]    (qkf)  {$q_{kf}$};
+\node[state, right of=qkf]     (qfr)  {$q_{fr}$};
+\node[state, accepting,
+      below of=qkf]            (qex)  {\textbf{$q_{ex}$}};
+
+\draw (q0)   edge node[above]{\small SELECT}  (qsel);
+\draw (qsel) edge[loop above] node{\small IDENT}   (qsel);
+\draw (qsel) edge node[above]{\small STAR}    (qkf);
+\draw (qsel) edge[bend right=30] node[below]{\small FROM}  (qfr);
+\draw (qkf)  edge node[above]{\small FROM}    (qfr);
+\draw (qfr)  edge node[right]{\small IDENT}   (qex);
+
+\end{tikzpicture}
+\caption{NFA para detección de Exfiltración (\texttt{pgsql-exfil-v1}).
+  Aceptación requiere adicionalmente ausencia de \tok{WHERE} y \tok{LIMIT}.}
+\label{fig:nfa-exfil}
+\end{figure}
+
+%======================================================================
+\chapter{Tablas de Transiciones}
+%======================================================================
+
+\section{SQL Injection — \texttt{pgsql-sqli-v2}}
+
+La siguiente tabla presenta la función de transición $\delta$ completa del
+autómata de SQL Injection. Los estados se nombran abreviados para facilitar
+la lectura.
+
+\begin{center}
+\small
+\begin{longtable}{lll}
+\caption{Tabla de transiciones — SQL Injection (\texttt{pgsql-sqli-v2})}
+\label{tab:delta-sqli}\\
+  \toprule
+  \textbf{Estado origen} & \textbf{Símbolo} & \textbf{Estado destino} \\
+  \midrule
+  \endfirsthead
+  \caption[]{Tabla de transiciones — SQL Injection (continuación)}\\
+  \toprule
+  \textbf{Estado origen} & \textbf{Símbolo} & \textbf{Estado destino} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  \midrule
+  $q_0$       & SELECT             & $q_{\text{prefix}}$ \\
+  $q_0$       & TAUTOLOGY          & $q_{\text{sqli}}$   \\
+  $q_0$       & SLEEP              & $q_{\text{sqli}}$   \\
+  $q_0$       & INFORMATION\_SCHEMA& $q_{\text{sqli}}$   \\
+  $q_0$       & OR                 & $q_{\text{or}}$     \\
+  $q_0$       & UNION              & $q_{\text{union}}$  \\
+  $q_0$       & UNION\_ALL         & $q_{\text{union}}$  \\
+  \midrule
+  $q_{\text{prefix}}$ & IDENT      & $q_{\text{prefix}}$ \\
+  $q_{\text{prefix}}$ & STAR       & $q_{\text{prefix}}$ \\
+  $q_{\text{prefix}}$ & FROM       & $q_{\text{tbl}}$    \\
+  $q_{\text{prefix}}$ & SLEEP      & $q_{\text{sqli}}$   \\
+  \midrule
+  $q_{\text{tbl}}$ & IDENT         & $q_{\text{tbl}}$    \\
+  $q_{\text{tbl}}$ & INFORMATION\_SCHEMA & $q_{\text{sqli}}$ \\
+  $q_{\text{tbl}}$ & WHERE         & $q_{\text{where}}$  \\
+  $q_{\text{tbl}}$ & SEMICOLON     & $q_{\text{sqli}}$   \\
+  \midrule
+  $q_{\text{where}}$ & IDENT       & $q_{\text{col}}$    \\
+  $q_{\text{where}}$ & TAUTOLOGY   & $q_{\text{sqli}}$   \\
+  $q_{\text{where}}$ & SEMICOLON   & $q_{\text{sqli}}$   \\
+  \midrule
+  $q_{\text{col}}$ & EQUALS        & $q_{\text{eq}}$     \\
+  \midrule
+  $q_{\text{eq}}$ & STRING         & $q_{\text{val}}$    \\
+  $q_{\text{eq}}$ & NUMBER         & $q_{\text{val}}$    \\
+  \midrule
+  $q_{\text{val}}$ & OR            & $q_{\text{sqli}}$   \\
+  $q_{\text{val}}$ & UNION         & $q_{\text{sqli}}$   \\
+  $q_{\text{val}}$ & UNION\_ALL    & $q_{\text{sqli}}$   \\
+  $q_{\text{val}}$ & TAUTOLOGY     & $q_{\text{sqli}}$   \\
+  $q_{\text{val}}$ & SLEEP         & $q_{\text{sqli}}$   \\
+  $q_{\text{val}}$ & INFORMATION\_SCHEMA & $q_{\text{sqli}}$ \\
+  $q_{\text{val}}$ & SEMICOLON     & $q_{\text{sqli}}$   \\
+  \midrule
+  $q_{\text{or}}$ & TAUTOLOGY      & $q_{\text{sqli}}$   \\
+  $q_{\text{or}}$ & NUMBER         & $q_{\text{sqli}}$   \\
+  $q_{\text{or}}$ & STRING         & $q_{\text{sqli}}$   \\
+  \midrule
+  $q_{\text{union}}$ & SELECT      & $q_{\text{sqli}}$   \\
+  $q_{\text{union}}$ & ALL         & $q_{\text{sqli}}$   \\
+  \midrule
+  $q_{\text{sqli}}$ & SELECT       & $q_{\text{sqli}}$   \\
+  $q_{\text{sqli}}$ & TAUTOLOGY    & $q_{\text{sqli}}$   \\
+  $q_{\text{sqli}}$ & UNION        & $q_{\text{sqli}}$   \\
+  $q_{\text{sqli}}$ & UNION\_ALL   & $q_{\text{sqli}}$   \\
+  $q_{\text{sqli}}$ & SLEEP        & $q_{\text{sqli}}$   \\
+  \bottomrule
+\end{longtable}
+\end{center}
+
+\section{Privilege Escalation — \texttt{pgsql-privesc-v1}}
+
+\begin{table}[htbp]
+\centering
+\caption{Tabla de transiciones — Privilege Escalation (\texttt{pgsql-privesc-v1})}
+\label{tab:delta-privesc}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Estado origen} & \textbf{Símbolo} & \textbf{Estado destino} \\
+  \midrule
+  $q_0$          & ALTER     & $q_{\text{alter}}$  \\
+  $q_{\text{alter}}$  & USER      & $q_{\text{target}}$ \\
+  $q_{\text{alter}}$  & ROLE      & $q_{\text{target}}$ \\
+  $q_{\text{target}}$ & IDENT     & $q_{\text{name}}$   \\
+  $q_{\text{name}}$   & WITH      & $q_{\text{with}}$   \\
+  $q_{\text{name}}$   & SUPERUSER & $q_{\text{super}}$  \\
+  $q_{\text{with}}$   & SUPERUSER & $q_{\text{super}}$  \\
+  \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Data Exfiltration — \texttt{pgsql-exfil-v1}}
+
+\begin{table}[htbp]
+\centering
+\caption{Tabla de transiciones — Data Exfiltration (\texttt{pgsql-exfil-v1})}
+\label{tab:delta-exfil}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Estado origen} & \textbf{Símbolo} & \textbf{Estado destino} \\
+  \midrule
+  $q_0$               & SELECT & $q_{\text{sel}}$   \\
+  $q_{\text{sel}}$    & IDENT  & $q_{\text{sel}}$   \\
+  $q_{\text{sel}}$    & STAR   & $q_{\text{kw\_from}}$ \\
+  $q_{\text{sel}}$    & FROM   & $q_{\text{from}}$  \\
+  $q_{\text{kw\_from}}$ & FROM & $q_{\text{from}}$  \\
+  $q_{\text{from}}$   & IDENT  & $q_{\text{ex}}$    \\
+  \bottomrule
+\end{tabular}
+\end{table}
+
+\begin{nota}
+  Para el perfil de exfiltración, la tabla de transiciones define únicamente
+  las transiciones positivas. La restricción negativa $\mathit{absent} =
+  \{\texttt{WHERE}, \texttt{LIMIT}\}$ se evalúa \emph{post-facto}: si la cadena
+  de tokens contiene alguno de estos dos tokens, la aceptación se cancela
+  aunque el estado $q_{\text{ex}}$ sea alcanzado.
+\end{nota}
+
+%======================================================================
+\chapter{Decisiones de Diseño Justificadas}
+%======================================================================
+
+\section{Uso de NFA en lugar de expresiones regulares simples}
+
+\textbf{Decisión:} modelar cada patrón de ataque como un NFA serializado en
+JSON en lugar de codificar expresiones regulares directamente en el código.
+
+\textbf{Justificación:}
+\begin{itemize}
+  \item \emph{Extensibilidad sin recompilación:} agregar un nuevo perfil de
+    amenaza requiere únicamente crear un archivo JSON y copiarlo al directorio
+    \texttt{NFA/}. No se modifica ni compila el código C\#.
+  \item \emph{Separación de responsabilidades:} el motor (\texttt{NfaEngine})
+    es agnóstico al tipo de amenaza; los analistas de seguridad pueden definir
+    o ajustar perfiles sin conocer el código fuente.
+  \item \emph{Auditabilidad:} el estado del sistema de detección queda
+    explicitamente documentado en archivos de texto (JSON) que pueden
+    versionarse, revisarse y auditarse.
+  \item \emph{Composabilidad:} múltiples perfiles se ejecutan en paralelo
+    sobre la misma secuencia de tokens en $O(|w| \cdot |Q_{\text{total}}|)$.
+\end{itemize}
+
+\section{Tokenización en cuatro fases con marcador TAUTOLOGY}
+
+\textbf{Decisión:} incorporar una fase de pre-análisis semántico (Fase~2) que
+reemplaza expresiones tautológicas por el token especial \tok{TAUTOLOGY} antes
+del escaneo léxico.
+
+\textbf{Justificación:}
+\begin{itemize}
+  \item Un NFA que intentara reconocer directamente \texttt{1=1} o \texttt{'x'='x'}
+    necesitaría transiciones para todos los posibles valores numéricos y cadenas,
+    lo que resultaría en un autómata de tamaño exponencial.
+  \item Al abstraer la tautología a un único token, el NFA permanece pequeño
+    y lineal, y el reconocimiento es $O(|w|)$ en lugar de $O(|w| \cdot |\Sigma_{\text{val}}|)$.
+  \item Las 5 expresiones regulares usadas para detectar tautologías están
+    acotadas (longitudes máximas en cuantificadores) para prevenir ataques
+    ReDoS (\emph{Regular expression Denial of Service}).
+\end{itemize}
+
+\section{Modo de reconocimiento de subcadena (\emph{substring match})}
+
+\textbf{Decisión:} reinyectar $q_0$ en el conjunto activo en cada paso de
+simulación, convirtiendo el NFA en un detector de subcadenas.
+
+\textbf{Justificación:}
+\begin{itemize}
+  \item Las consultas SQL legítimas rara vez son secuencias puras del patrón
+    de ataque; el payload malicioso suele estar embebido en una consulta
+    más amplia (e.g., \texttt{SELECT id FROM t WHERE name='x' OR 1=1}).
+  \item Exigir que el NFA reconozca la cadena \emph{completa} desde $q_0$
+    generaría falsos negativos masivos.
+  \item La reinyección de $q_0$ mantiene la complejidad lineal sin requerir
+    la construcción explícita de un DFA o el uso de búsqueda por sufijos.
+\end{itemize}
+
+\section{Restricción negativa (\texttt{requireAbsentTokens})}
+
+\textbf{Decisión:} añadir un mecanismo de post-condición negativa a los
+perfiles NFA para invalidar la aceptación cuando ciertos tokens están presentes.
+
+\textbf{Justificación:}
+\begin{itemize}
+  \item El perfil de exfiltración (\texttt{pgsql-exfil-v1}) detecta
+    \texttt{SELECT * FROM tabla}. Sin la restricción negativa, cualquier consulta
+    legítima como \texttt{SELECT * FROM config WHERE id=1} sería marcada como
+    amenaza (falso positivo).
+  \item Codificar la ausencia de \tok{WHERE} directamente en el NFA requeriría
+    estados adicionales para cada token que \emph{no} sea WHERE, haciendo
+    el autómata exponencialmente complejo.
+  \item La verificación post-facto es $O(|\mathit{absent}|)$ y se realiza
+    una sola vez por evaluación exitosa, sin impacto práctico en el rendimiento.
+\end{itemize}
+
+\section{Arquitectura de pipeline asíncrono}
+\noindent\textbf{Componente:} \texttt{Channel\textless T\textgreater}.
+
+\textbf{Decisión:} desacoplar la lectura de archivos, el parseo y la evaluación
+NFA mediante un canal productor-consumidor (\texttt{System.Threading.Channels}).
+
+\textbf{Justificación:}
+\begin{itemize}
+  \item PostgreSQL puede emitir rafagas de cientos de líneas por segundo bajo
+    carga. Un modelo síncrono bloquearía la UI de WPF (que corre en el hilo
+    principal) durante el procesamiento.
+  \item \texttt{Channel\textless T\textgreater} proporciona backpressure natural: si el consumidor
+    (NFA engine) va lento, el canal acumula sin perder entradas.
+  \item El modelo \emph{async/await} de .NET 10 permite que la UI siga
+    respondiendo mientras el motor procesa logs en segundo plano.
+\end{itemize}
+
+\section{Evaluación de perfiles en formato JSON con tipado fuerte}
+
+\textbf{Decisión:} serializar los perfiles NFA en JSON con esquema fijo.
+El tipo \texttt{AutomatonProfile} se deserializa con \texttt{System.Text.Json}.
+
+\textbf{Justificación:}
+\begin{itemize}
+  \item JSON es un formato ubicuo, legible por humanos y soportado nativamente
+    en .NET sin dependencias externas.
+  \item El tipado fuerte (clases C\# con anotaciones \texttt{JsonPropertyName})
+    detecta errores de configuración en tiempo de carga, no en tiempo de
+    ejecución durante una detección.
+  \item Los archivos JSON se copian al directorio de salida con la política
+    \texttt{PreserveNewest}, garantizando que la versión del perfil coincida
+    con la versión del binario.
+\end{itemize}
+
+%======================================================================
+\chapter{Cadenas de Prueba}
+%======================================================================
+
+En esta sección se presentan cadenas de tokens de prueba con su trayectoria
+de estados en el NFA correspondiente y el resultado esperado.
+
+\section{Pruebas sobre SQL Injection (\texttt{pgsql-sqli-v2})}
+
+\subsection{Caso P1 — Tautología directa}
+
+\textbf{Consulta SQL:}
+\begin{lstlisting}[style=json, numbers=none]
+SELECT * FROM users WHERE id=1 OR 1=1
+\end{lstlisting}
+
+\textbf{Secuencia de tokens tras tokenización:}
+\[
+  \texttt{SELECT, STAR, FROM, IDENT, WHERE, IDENT, EQUALS, NUMBER, OR, TAUTOLOGY}
+\]
+
+\textbf{Traza de estados:}
+\begin{center}
+\begin{tabular}{llll}
+  \toprule
+  \textbf{Paso} & \textbf{Token} & \textbf{Estados activos} & \textbf{Acción} \\
+  \midrule
+  0  & —            & $\{q_0\}$                              & inicio \\
+  1  & SELECT       & $\{q_0, q_{\text{prefix}}\}$           & $q_0 \xrightarrow{\text{SELECT}} q_{\text{prefix}}$ \\
+  2  & STAR         & $\{q_0, q_{\text{prefix}}\}$           & loop \\
+  3  & FROM         & $\{q_0, q_{\text{tbl}}\}$              & $q_{\text{prefix}} \xrightarrow{\text{FROM}} q_{\text{tbl}}$ \\
+  4  & IDENT        & $\{q_0, q_{\text{tbl}}\}$              & loop \\
+  5  & WHERE        & $\{q_0, q_{\text{where}}\}$            & $q_{\text{tbl}} \xrightarrow{\text{WHERE}} q_{\text{where}}$ \\
+  6  & IDENT        & $\{q_0, q_{\text{col}}\}$              & $q_{\text{where}} \xrightarrow{\text{IDENT}} q_{\text{col}}$ \\
+  7  & EQUALS       & $\{q_0, q_{\text{eq}}\}$               & $q_{\text{col}} \xrightarrow{\text{EQUALS}} q_{\text{eq}}$ \\
+  8  & NUMBER       & $\{q_0, q_{\text{val}}\}$              & $q_{\text{eq}} \xrightarrow{\text{NUMBER}} q_{\text{val}}$ \\
+  9  & OR           & $\{q_0, q_{\text{sqli}}, q_{\text{or}}\}$ & $q_{\text{val}} \xrightarrow{\text{OR}} q_{\text{sqli}}$ \\
+  10 & TAUTOLOGY    & $\{q_0, q_{\text{sqli}}\}$             & $\mathbf{ACEPTA}$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Resultado:} \severity{danger}{AMENAZA} detectada. Tipo: \texttt{SQLI}, severidad: High.
+
+\subsection{Caso P2 — UNION Injection}
+
+\textbf{Consulta SQL:}
+\begin{lstlisting}[style=json, numbers=none]
+SELECT id FROM t UNION ALL SELECT password FROM pg_shadow
+\end{lstlisting}
+
+\textbf{Secuencia de tokens:}
+\[
+  \texttt{SELECT, IDENT, FROM, IDENT, UNION\_ALL, SELECT, IDENT, FROM, IDENT}
+\]
+
+\textbf{Traza abreviada:}
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Token} & \textbf{Estados activos} & \textbf{Nota} \\
+  \midrule
+  SELECT    & $\{q_0, q_{\text{prefix}}\}$ & \\
+  IDENT     & $\{q_0, q_{\text{prefix}}\}$ & loop \\
+  FROM      & $\{q_0, q_{\text{tbl}}\}$    & \\
+  IDENT     & $\{q_0, q_{\text{tbl}}\}$    & loop \\
+  UNION\_ALL& $\{q_0, q_{\text{union}}\}$  & $q_0 \xrightarrow{\text{U\_ALL}} q_{\text{union}}$ \\
+  SELECT    & $\{q_0, q_{\text{prefix}}, q_{\text{sqli}}\}$ & \textbf{ACEPTA} \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Resultado:} \severity{danger}{AMENAZA} — UNION Injection confirmado.
+
+\subsection{Caso P3 — Consulta legítima (no debe activar alarma)}
+
+\textbf{Consulta SQL:}
+\begin{lstlisting}[style=json, numbers=none]
+SELECT username, email FROM accounts WHERE user_id = 42
+\end{lstlisting}
+
+\textbf{Secuencia de tokens:}
+\[
+  \texttt{SELECT, IDENT, IDENT, FROM, IDENT, WHERE, IDENT, EQUALS, NUMBER}
+\]
+
+El autómata alcanza $q_{\text{val}}$ pero no recibe ningún token que
+provoque transición a $q_{\text{sqli}}$. La cadena termina en
+$\{q_0, q_{\text{val}}\}$ — $q_{\text{val}} \notin F$.
+
+\textbf{Resultado:} \severity{success}{BENIGNA} — sin amenaza detectada. \checkmark
+
+\section{Pruebas sobre Privilege Escalation}
+\noindent\textbf{Perfil:} \texttt{pgsql-privesc-v1}.
+
+\subsection{Caso P4 — Escalada directa}
+
+\textbf{Consulta:} \texttt{ALTER USER administrador SUPERUSER}
+
+\textbf{Tokens:} \texttt{ALTER, USER, IDENT, SUPERUSER}
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Token} & \textbf{Estados activos} & \\
+  \midrule
+  ALTER     & $\{q_0, q_{\text{alter}}\}$  & \\
+  USER      & $\{q_0, q_{\text{target}}\}$ & \\
+  IDENT     & $\{q_0, q_{\text{name}}\}$   & \\
+  SUPERUSER & $\{q_0, q_{\text{super}}\}$  & \textbf{ACEPTA} \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Resultado:} \severity{danger}{AMENAZA CRÍTICA} — Privilege Escalation.
+
+\subsection{Caso P5 — Con cláusula WITH}
+
+\textbf{Consulta:} \texttt{ALTER ROLE devuser WITH SUPERUSER}
+
+\textbf{Tokens:} \texttt{ALTER, ROLE, IDENT, WITH, SUPERUSER}
+
+Traza: $q_0 \to q_{\text{alter}} \to q_{\text{target}} \to q_{\text{name}}
+\to q_{\text{with}} \to q_{\text{super}}$.
+
+\textbf{Resultado:} \severity{danger}{AMENAZA CRÍTICA} detectada también por
+la ruta alternativa \texttt{WITH}.
+
+\section{Pruebas sobre Data Exfiltration}
+\noindent\textbf{Perfil:} \texttt{pgsql-exfil-v1}.
+
+\subsection{Caso P6 — Volcado masivo}
+
+\textbf{Consulta:} \texttt{SELECT * FROM clientes}
+
+\textbf{Tokens:} \texttt{SELECT, STAR, FROM, IDENT}
+
+Ningún token en $\mathit{absent} = \{\texttt{WHERE, LIMIT}\}$ presente.
+Autómata alcanza $q_{\text{ex}}$.
+
+\textbf{Resultado:} \severity{danger}{AMENAZA} — Data Exfiltration.
+
+\subsection{Caso P7 — SELECT * legítimo con WHERE}
+
+\textbf{Consulta:} \texttt{SELECT * FROM pedidos WHERE estado='activo' LIMIT 100}
+
+Tokens incluyen \tok{WHERE} y \tok{LIMIT}. El autómata alcanza $q_{\text{ex}}$
+pero la restricción negativa invalida la aceptación.
+
+\textbf{Resultado:} \severity{success}{BENIGNA} — restricción negativa activa. \checkmark
+
+\section{Resumen de Cadenas de Prueba}
+
+\begin{table}[htbp]
+\centering
+\caption{Resumen de resultados de pruebas}
+\label{tab:pruebas}
+\begin{tabularx}{\textwidth}{clXcc}
+  \toprule
+  \textbf{ID} & \textbf{Perfil} & \textbf{Patrón} & \textbf{Esperado} & \textbf{Obtenido} \\
+  \midrule
+  P1 & SQLI      & Tautología OR 1=1            & AMENAZA  & \color{success}\checkmark \\
+  P2 & SQLI      & UNION ALL SELECT pg\_shadow  & AMENAZA  & \color{success}\checkmark \\
+  P3 & SQLI      & Consulta legítima con WHERE  & BENIGNA  & \color{success}\checkmark \\
+  P4 & PRIVESC   & ALTER USER SUPERUSER directo & AMENAZA  & \color{success}\checkmark \\
+  P5 & PRIVESC   & ALTER ROLE WITH SUPERUSER    & AMENAZA  & \color{success}\checkmark \\
+  P6 & EXFIL     & SELECT * FROM sin WHERE      & AMENAZA  & \color{success}\checkmark \\
+  P7 & EXFIL     & SELECT * con WHERE y LIMIT   & BENIGNA  & \color{success}\checkmark \\
+  \bottomrule
+\end{tabularx}
+\end{table}
+
+Todos los casos producen el resultado esperado, validando la corrección de los
+autómatas y la eficacia de los mecanismos auxiliares (tautología, restricción
+negativa, modo substring).
+
+%======================================================================
+\chapter{Conclusiones}
+%======================================================================
+
+\section{Síntesis del sistema}
+
+LogGuard V2 implementa un sistema de detección de intrusiones en tiempo real
+para PostgreSQL basado en la teoría formal de autómatas finitos. La arquitectura
+puede resumirse en tres pilares:
+
+\begin{enumerate}
+  \item \textbf{Análisis léxico en dos niveles:} el parseo de logs de PostgreSQL
+    produce entradas estructuradas; la tokenización SQL de cuatro fases transforma
+    sentencias SQL en secuencias sobre un alfabeto controlado de más de 70 tokens.
+  \item \textbf{Detección mediante NFA:} seis perfiles NFA serializados en JSON
+    reconocen subcadenas de tokens que corresponden a patrones de ataque
+    conocidos (SQL Injection, Exfiltración, Escalada de Privilegios, Fuerza
+    Bruta, Descubrimiento y Inyección Temporal).
+  \item \textbf{Arquitectura reactiva:} un pipeline asíncrono basado en
+    \texttt{Channel\textless T\textgreater} permite monitorear logs con baja latencia sin bloquear
+    la interfaz gráfica.
+\end{enumerate}
+
+\section{Fortalezas del diseño}
+
+\begin{itemize}
+  \item \emph{Extensibilidad:} nuevos vectores de ataque se incorporan añadiendo
+    archivos JSON sin modificar el código del motor.
+  \item \emph{Resistencia a evasión:} la normalización (Fase~1) y la detección
+    semántica de tautologías (Fase~2) contrarrestan técnicas comunes de
+    ofuscación SQL.
+  \item \emph{Rendimiento predecible:} la complejidad lineal $O(|w| \cdot |Q|)$
+    del simulador de subconjuntos garantiza tiempos de respuesta acotados
+    independientemente del contenido de la consulta.
+  \item \emph{Precisión ajustable:} la restricción negativa reduce falsos
+    positivos sin aumentar la complejidad del autómata.
+\end{itemize}
+
+\section{Limitaciones y trabajo futuro}
+
+\begin{itemize}
+  \item \emph{Cobertura de vocabulario:} el sistema reconoce dialecto PostgreSQL.
+    Extensión a otros dialectos (MySQL, MSSQL, Oracle) requeriría perfiles NFA
+    adicionales y ajustes al tokenizador.
+  \item \emph{Ataques de contexto múltiple:} ataques que distribuyen el payload
+    en múltiples consultas (e.g., inyección por batches) no son detectados por
+    los perfiles actuales, que operan consulta por consulta.
+  \item \emph{Aprendizaje automático:} los perfiles NFA son diseñados manualmente.
+    Un sistema de inferencia automática de autómatas (e.g., L*) a partir de
+    tráfico etiquetado aumentaría la cobertura de detección.
+  \item \emph{Explotación de SLEEP:} la detección de inyección basada en tiempo
+    mediante el token \tok{SLEEP} no considera el tiempo real de ejecución
+    registrado en las líneas \texttt{duration:}, que sería un indicador más
+    preciso.
+\end{itemize}
+
+\section{Conclusión final}
+
+LogGuard V2 demuestra que la teoría formal de autómatas tiene aplicación
+directa y práctica en sistemas de seguridad modernos. La elección de NFA como
+motor de detección ofrece un balance óptimo entre expresividad formal,
+rendimiento computacional y mantenibilidad operacional. El sistema es capaz de
+detectar en tiempo real las principales clases de ataques SQL sobre PostgreSQL,
+con tasas de falsos positivos bajas gracias a los mecanismos de restricción
+negativa y normalización semántica.
+
+\bigskip
+\begin{center}
+\rule{8cm}{0.4pt}\\[0.3cm]
+{\small Adolfo Toledo — LogGuard V2 — Junio 2026}
+\end{center}
+
+%======================================================================
+\end{document}
+%======================================================================
