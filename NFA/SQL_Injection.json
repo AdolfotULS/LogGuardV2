@@ -24,7 +24,12 @@
     "TAUTOLOGY",
     "SLEEP",
     "INFORMATION_SCHEMA",
-    "SEMICOLON"
+    "SYSTEM_TABLE",
+    "SEMICOLON",
+    "XP_CMDSHELL",
+    "INTO_OUTFILE",
+    "EXEC",
+    "BENCHMARK"
   ],
   "states": [
     {
@@ -82,7 +87,12 @@
     { "from": "q0",      "symbol": "SELECT",             "to": "q_prefix" },
     { "from": "q0",      "symbol": "TAUTOLOGY",          "to": "q_sqli"   },
     { "from": "q0",      "symbol": "SLEEP",              "to": "q_sqli"   },
+    { "from": "q0",      "symbol": "BENCHMARK",          "to": "q_sqli"   },
     { "from": "q0",      "symbol": "INFORMATION_SCHEMA", "to": "q_sqli"   },
+    { "from": "q0",      "symbol": "SYSTEM_TABLE",       "to": "q_sqli"   },
+    { "from": "q0",      "symbol": "XP_CMDSHELL",        "to": "q_sqli"   },
+    { "from": "q0",      "symbol": "INTO_OUTFILE",       "to": "q_sqli"   },
+    { "from": "q0",      "symbol": "EXEC",               "to": "q_sqli"   },
     { "from": "q0",      "symbol": "OR",                 "to": "q_or"     },
     { "from": "q0",      "symbol": "UNION",              "to": "q_union"  },
     { "from": "q0",      "symbol": "UNION_ALL",          "to": "q_union"  },
@@ -111,7 +121,12 @@
     { "from": "q_val",   "symbol": "UNION_ALL",          "to": "q_sqli"   },
     { "from": "q_val",   "symbol": "TAUTOLOGY",          "to": "q_sqli"   },
     { "from": "q_val",   "symbol": "SLEEP",              "to": "q_sqli"   },
+    { "from": "q_val",   "symbol": "BENCHMARK",          "to": "q_sqli"   },
     { "from": "q_val",   "symbol": "INFORMATION_SCHEMA", "to": "q_sqli"   },
+    { "from": "q_val",   "symbol": "SYSTEM_TABLE",       "to": "q_sqli"   },
+    { "from": "q_val",   "symbol": "XP_CMDSHELL",        "to": "q_sqli"   },
+    { "from": "q_val",   "symbol": "INTO_OUTFILE",       "to": "q_sqli"   },
+    { "from": "q_val",   "symbol": "EXEC",               "to": "q_sqli"   },
     { "from": "q_val",   "symbol": "SEMICOLON",          "to": "q_sqli"   },
 
     { "from": "q_or",    "symbol": "TAUTOLOGY",          "to": "q_sqli"   },
@@ -125,7 +140,8 @@
     { "from": "q_sqli",  "symbol": "TAUTOLOGY",          "to": "q_sqli"   },
     { "from": "q_sqli",  "symbol": "UNION",              "to": "q_sqli"   },
     { "from": "q_sqli",  "symbol": "UNION_ALL",          "to": "q_sqli"   },
-    { "from": "q_sqli",  "symbol": "SLEEP",              "to": "q_sqli"   }
+    { "from": "q_sqli",  "symbol": "SLEEP",              "to": "q_sqli"   },
+    { "from": "q_sqli",  "symbol": "BENCHMARK",          "to": "q_sqli"   }
   ],
   "metadata": {
     "severity": "High",

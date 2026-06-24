@@ -155,9 +155,24 @@ namespace LogGuardV2.src.Engine
             m = DurationRegex.Match(message);
             if (m.Success)
             {
-                entry.Type      = PgLogLineType.Duration;
-                entry.DurationMs = ParseNullableDouble(m.Groups["duration_ms"].Value);
-                entry.Message   = m.Groups["detail"].Success ? m.Groups["detail"].Value : "duration";
+                var durationMs = ParseNullableDouble(m.Groups["duration_ms"].Value);
+                var detail     = m.Groups["detail"].Success ? m.Groups["detail"].Value : "";
+
+                // Combined "duration: X ms  statement: SQL" — PostgreSQL log_min_duration_statement mode.
+                // Treat as a Statement so the NFA engine analyses the SQL.
+                const string stmtKey = "statement:";
+                if (detail.StartsWith(stmtKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    entry.Type       = PgLogLineType.Statement;
+                    entry.DurationMs = durationMs;
+                    entry.Message    = detail.Substring(stmtKey.Length).TrimStart();
+                }
+                else
+                {
+                    entry.Type       = PgLogLineType.Duration;
+                    entry.DurationMs = durationMs;
+                    entry.Message    = detail.Length > 0 ? detail : "duration";
+                }
                 return;
             }
 

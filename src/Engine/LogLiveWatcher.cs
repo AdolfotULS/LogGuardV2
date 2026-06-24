@@ -274,13 +274,42 @@ namespace LogGuardV2.src.Engine
                 UserHost   = $"{ctx.User ?? pg.User ?? pg.Identity ?? "unknown"}@{ctx.Host ?? pg.Host ?? "unknown"}",
                 Database   = !string.IsNullOrEmpty(ctx.Database) ? ctx.Database : (!string.IsNullOrEmpty(pg.Database) ? pg.Database : ""),
                 Query      = pg.Message,
-                Duration   = 0,   // populated when the matching Duration line arrives
+                Duration   = pg.DurationMs ?? 0,
                 IsInjected = matchedEngine != null,
                 ThreatType = matchedEngine?.ThreatType ?? ""
             };
 
-            // D1: buffer until paired Duration line fires the entry
-            _pidPending[pid2] = (entry, Environment.TickCount64);
+            // D1: combined format (log_min_duration_statement) already has duration in pg.DurationMs —
+            // fire immediately. Separate-line format: buffer until the paired Duration line arrives.
+            if (pg.DurationMs.HasValue)
+            {
+                if (_bfCandidatePid.Remove(pid2, out var bfImm))
+                {
+                    var (bfKey, bfSev) = bfImm;
+                    if (_bfWindow.TryGetValue(bfKey, out var wq) && wq.Count >= BfThreshold)
+                    {
+                        UpgradeEntryToBf(entry, bfSev);
+                        EntryDetected?.Invoke(entry);
+                        FlushBfBuffer(bfKey, bfSev);
+                    }
+                    else
+                    {
+                        if (!_bfBuffer.TryGetValue(bfKey, out var buf))
+                            _bfBuffer[bfKey] = buf = new Queue<LogEntry>();
+                        if (buf.Count >= BfThreshold - 1)
+                            EntryDetected?.Invoke(buf.Dequeue());
+                        buf.Enqueue(entry);
+                    }
+                }
+                else
+                {
+                    EntryDetected?.Invoke(entry);
+                }
+            }
+            else
+            {
+                _pidPending[pid2] = (entry, Environment.TickCount64);
+            }
         }
 
         // A3b: mark a log entry as confirmed brute-force
