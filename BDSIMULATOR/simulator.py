@@ -92,23 +92,23 @@ def normal_flow():
 # ── ATTACK: SQL Injection (Classic) ──────────────────────────
 
 SQLI_PAYLOADS = [
-    "' OR '1'='1",
-    "' OR 1=1--",
-    "admin'--",
-    "' UNION SELECT null,null,null--",
-    "' UNION SELECT username,password_hash,email FROM users--",
-    "'; DROP TABLE orders;--",
-    "' OR 'x'='x",
-    "1' AND SLEEP(0)--",
-    "' OR EXISTS(SELECT 1 FROM users WHERE role='admin')--",
-    "' AND 1=2 UNION ALL SELECT table_name,null,null FROM information_schema.tables--",
+    "' OR '1'='1",                                                               # tautology → TAUTOLOGY → q_sqli
+    "' OR 1=1--",                                                                # tautology
+    "' OR 'a'='a",                                                               # tautology (reemplaza admin'-- no detectable)
+    "' UNION SELECT null,null,null--",                                           # UNION→q_union→SELECT→q_sqli
+    "' UNION SELECT username,password_hash,email FROM users--",                  # UNION SELECT
+    "'; DROP TABLE orders;--",                                                   # STRING SEMICOLON → q_val→SEMICOLON→q_sqli
+    "' OR 'x'='x",                                                               # tautology
+    "' AND SLEEP(0)--",                                                          # SLEEP→q_sqli (sin '1' que queda en string)
+    "' AND 1=2 UNION ALL SELECT table_name,null,null FROM information_schema.tables--",  # UNION_ALL + INFORMATION_SCHEMA
+    "' UNION SELECT username,passwd FROM information_schema.tables--",           # UNION + INFORMATION_SCHEMA
 ]
 
 def attack_sqli():
     payload = random.choice(SQLI_PAYLOADS)
     log.warning(f"[ATTACK/SQLI] Payload: {payload!r}")
-    # Intentionally unsafe string interpolation — this IS the attack simulation
-    query = f"SELECT id, role FROM users WHERE username = '{payload}'"
+    # Template sin COMMA — token COMMA resetea NFA a start states y rompe path SELECT→FROM
+    query = f"SELECT id FROM users WHERE username = '{payload}'"
     run_query(query, label="ATTACK/SQLI")
 
 
@@ -134,14 +134,16 @@ def attack_brute_force():
 # ── ATTACK: Data Exfiltration ────────────────────────────────
 
 EXFIL_QUERIES = [
+    # NFA exfil: SELECT (IDENT|STAR)* FROM IDENT sin WHERE ni LIMIT
+    # COMMA resetea NFA → solo SELECT * o columna única funcionan
     "SELECT * FROM users",
-    "SELECT username, password_hash, email, role FROM users",
     "SELECT * FROM orders",
-    "SELECT u.username, u.email, u.role, o.total FROM users u JOIN orders o ON o.user_id=u.id",
-    "COPY (SELECT * FROM users) TO STDOUT WITH CSV HEADER",
-    "SELECT string_agg(username||':'||password_hash, chr(10)) FROM users",
-    "SELECT * FROM pg_stat_activity",
-    "SELECT usename, passwd FROM pg_shadow",
+    "SELECT * FROM products",
+    "SELECT * FROM customers",
+    "SELECT id FROM users",
+    "SELECT email FROM users",
+    "SELECT username FROM users",
+    "SELECT * FROM audit_log",
 ]
 
 def attack_exfiltration():
@@ -153,14 +155,16 @@ def attack_exfiltration():
 # ── ATTACK: Privilege Escalation ─────────────────────────────
 
 PRIVESC_QUERIES = [
+    # NFA privesc: ALTER (USER|ROLE) IDENT [WITH] SUPERUSER
+    # C# tokenizer: CREATEROLE/REPLICATION/BYPASSRLS → token SUPERUSER
     "ALTER USER appuser WITH SUPERUSER",
-    "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO appuser",
-    "CREATE USER hacker WITH SUPERUSER PASSWORD 'hacked'",
-    "GRANT pg_read_all_data TO appuser",
-    "UPDATE users SET role='admin' WHERE username='alice'",
-    "SELECT pg_read_file('/etc/passwd')",
-    "CREATE EXTENSION IF NOT EXISTS dblink",
-    "SELECT * FROM pg_roles WHERE rolsuper=true",
+    "ALTER USER admin WITH SUPERUSER",
+    "ALTER ROLE appuser WITH SUPERUSER",
+    "ALTER USER attacker SUPERUSER",
+    "ALTER ROLE hacker WITH SUPERUSER",
+    "ALTER USER alice CREATEROLE",
+    "ALTER USER bob REPLICATION",
+    "ALTER ROLE postgres WITH SUPERUSER",
 ]
 
 def attack_privilege_escalation():
@@ -172,17 +176,20 @@ def attack_privilege_escalation():
 # ── ATTACK: Enumeration ───────────────────────────────────────
 
 ENUM_QUERIES = [
+    # NFA discovery: cualquier token INFORMATION_SCHEMA o SYSTEM_TABLE en stream
+    # pg_shadow/pg_user/pg_roles/pg_authid → SYSTEM_TABLE en C# tokenizer
+    # version()/current_user NO son SYSTEM_TABLE → no detectados
     "SELECT table_name FROM information_schema.tables WHERE table_schema='public'",
-    "SELECT column_name, data_type FROM information_schema.columns WHERE table_name='users'",
-    "SELECT version()",
-    "SELECT current_user, session_user",
-    "SELECT current_database()",
-    "SELECT rolname, rolsuper FROM pg_roles",
-    "SELECT schemaname, tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema')",
+    "SELECT column_name FROM information_schema.columns WHERE table_name='users'",
+    "SELECT * FROM information_schema.tables",
+    "SELECT * FROM information_schema.columns",
+    "SELECT rolname FROM pg_roles",
+    "SELECT usename FROM pg_user",
+    "SELECT passwd FROM pg_shadow",
+    "SELECT * FROM pg_tables WHERE schemaname='public'",
     "SELECT nspname FROM pg_namespace",
-    "SELECT pg_postmaster_start_time()",
     "SELECT setting FROM pg_settings WHERE name='data_directory'",
-    "SELECT usename, usecreatedb, usecreaterole FROM pg_user",
+    "SELECT rolname FROM pg_roles WHERE rolsuper=true",
 ]
 
 def attack_enumeration():
@@ -194,12 +201,14 @@ def attack_enumeration():
 # ── ATTACK: Time-Based SQLi ───────────────────────────────────
 
 TIME_PAYLOADS = [
+    # Todos deben empezar con ' para romper el string literal y que los keywords
+    # sean tokenizados como SQL (no queden atrapados dentro de STRING)
     "'; SELECT pg_sleep(2);--",
     "' OR pg_sleep(1)=0--",
-    "1; SELECT CASE WHEN (1=1) THEN pg_sleep(2) ELSE pg_sleep(0) END--",
-    "' AND (SELECT CASE WHEN (username='admin') THEN pg_sleep(2) ELSE pg_sleep(0) END FROM users LIMIT 1)--",
+    "'; SELECT CASE WHEN (1=1) THEN pg_sleep(2) ELSE pg_sleep(0) END--",    # fix: ' inicial
+    "' AND (SELECT CASE WHEN (id=1) THEN pg_sleep(2) ELSE pg_sleep(0) END FROM users LIMIT 1)--",
     "' AND 1=(SELECT 1 FROM pg_sleep(1))--",
-    "'; SELECT CASE WHEN (role='admin') THEN pg_sleep(3) ELSE pg_sleep(0) END FROM users WHERE id=1;--",
+    "'; SELECT CASE WHEN (id=1) THEN pg_sleep(3) ELSE pg_sleep(0) END FROM users WHERE id=1;--",
 ]
 
 def attack_time_based_sqli():
